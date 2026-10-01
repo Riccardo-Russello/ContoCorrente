@@ -37,10 +37,10 @@ public class Person {
     public String getFirstName() {
         return firstName;
     }
-    public String getLast_name() {
+    public String getLastName() {
         return lastName;
     }
-    public LocalDate getDate_of_birth() {
+    public LocalDate getDateOfBirth() {
         return dateOfBirth;
     }
 

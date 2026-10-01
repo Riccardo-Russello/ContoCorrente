@@ -55,8 +55,8 @@ public class Account {
     }
 
     // === SETTER ===
-    public void setSaldo(BigDecimal balance) {
-        this.balance = balance;
+    public void setAccountNumber(String accountNumber) {
+        this.accountNumber = accountNumber;
     }
     public void setBalance(BigDecimal balance){     // Da usare nel Service per versamenti e prelievi
         this.balance = balance;
