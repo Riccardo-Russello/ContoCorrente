@@ -10,8 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
-/* Spring esegue il CommandLineRunner durante l'avvio. Serve a controllare
-    a ogni avvio del backend che il conto esiste e crearlo solo se manca. */
 @Component
 public class InizializzazioneConto implements CommandLineRunner {
     private final AccountRepository accountRepository;
@@ -25,12 +23,12 @@ public class InizializzazioneConto implements CommandLineRunner {
 
     @Override
     @Transactional
-    public void run(String... args){                                // Metodo chiamato sui componenti che implementano l'interfaccia
-        String accountNumber = "CC000001";                            // Assumo come primo numeroConto
-        if(accountRepository.existsByAccountNumber(accountNumber)){      // Se il conto con questo numero esiste, esce
+    public void run(String... args){
+        String accountNumber = "CC000001";
+        if(accountRepository.existsByAccountNumber(accountNumber)){
             return;
         }
-        Person person = new Person("Mario", "Rossi",    //.. altrimenti crea la persona, l'account e li salva entrambi
+        Person person = new Person("Mario", "Rossi",
                 LocalDate.of(1990, 5, 15));
         Person savedPerson = personRepository.save(person);
         Account account = new Account(savedPerson, accountNumber);

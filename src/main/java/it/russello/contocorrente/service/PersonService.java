@@ -1,6 +1,5 @@
 package it.russello.contocorrente.service;
 
-
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.entity.Person;
@@ -25,17 +24,16 @@ public class PersonService {
         this.accountRepository = accountRepository;
     }
 
-    // CREAZIONE DELLA PERSONA
-    @Transactional
+
     public PersonResponse create(PersonRequest request){
         validate(request);
-        Person person = new Person(request.first_name(), request.last_name(), request.date_of_birth());
+        Person person = new Person(request.firstName(), request.lastName(), request.dateOfBirth());
 
         Person savedPerson = personRepository.save(person);
         return PersonResponse.from(savedPerson);
     }
 
-    // GET DELLA PERSONA/E
+
     public List<PersonResponse> findAll(){
         return personRepository.findAll()
                 .stream()
@@ -46,21 +44,21 @@ public class PersonService {
         return PersonResponse.from(requirePerson(id));
     }
 
-    // UPDATE DELLA PERSONA
+
     @Transactional
     public PersonResponse update(Long id, PersonRequest request){
         Person person = requirePerson(id);
         validate(request);
 
-        person.setFirstName(request.first_name());
-        person.setLastName(request.last_name());
-        person.setDateOfBirth(request.date_of_birth());
+        person.setFirstName(request.firstName());
+        person.setLastName(request.lastName());
+        person.setDateOfBirth(request.dateOfBirth());
 
         Person savedPerson = personRepository.save(person);
         return PersonResponse.from(savedPerson);
     }
 
-    // DELETE DELLA PERSONA
+
     @Transactional
     public void delete(Long id){
         Person person = requirePerson(id);
@@ -72,26 +70,25 @@ public class PersonService {
         personRepository.flush();       // Forza l'esecuzione della cancellazione prima dell'uscita dal metodo
     }
 
-    // METODI PRIVATI PER LA VALIDAZIONE
 
-    // Se l'identificativo non esiste, lancia un 404 Not Found
+
     private Person requirePerson(Long id) {
         return personRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Persona non trovata"));
     }
 
-    // Serve a validare i dati della richiesta, quelle non valide non aggiornano la persona
+
     private void validate(PersonRequest request){
         if (request == null){
             throw invalidPerson("Corpo della richiesta obbligatorio");
         }
-        validateName(request.first_name(), "first_name");
-        validateName(request.last_name(), "last_name");
+        validateName(request.firstName(), "first_name");
+        validateName(request.lastName(), "last_name");
 
-        if(request.date_of_birth() == null){
+        if(request.dateOfBirth() == null){
             throw invalidPerson("Data di nascita è obbligatoria");
         }
-        if(request.date_of_birth().isAfter(LocalDate.now())){
+        if(request.dateOfBirth().isAfter(LocalDate.now())){
             throw invalidPerson("La data di nascita non può essere futura");
         }
     }

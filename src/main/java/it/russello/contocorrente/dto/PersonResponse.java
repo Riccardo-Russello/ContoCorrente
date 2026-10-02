@@ -4,11 +4,12 @@ import it.russello.contocorrente.entity.Person;
 
 import java.time.LocalDate;
 
-public record PersonResponse(Long id, String first_name, String last_name, LocalDate date_of_birth) {
+public record PersonResponse(Long id, String firstName, String lastName, LocalDate dateOfBirth) {
+
     public static PersonResponse from(Person person) {
         return new PersonResponse(person.getId(),
                                     person.getFirstName(),
                                     person.getLastName(),
                                     person.getDateOfBirth());
-    }   // Il controller restituisce questo DTO senza esporre le entity JPA
+    }
 }

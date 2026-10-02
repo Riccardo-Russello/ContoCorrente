@@ -7,7 +7,6 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "person")
 public class Person {
-    // ===== ATTRIBUTI =====
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,10 +18,10 @@ public class Person {
     private String lastName;
 
     @Column(name = "date_of_birth", nullable = false)
-    private LocalDate dateOfBirth;      // Rappresenta la data senza l'orario
+    private LocalDate dateOfBirth;
 
-    // ===== COSTRUTTORI =====
-    protected Person() {}   // Richiesto da JPA
+
+    protected Person() {}
     public Person(String firstName, String lastName,
                   LocalDate dateOfBirth) {
         this.firstName = firstName;
@@ -30,7 +29,7 @@ public class Person {
         this.dateOfBirth = dateOfBirth;
     }
 
-    // ===== GETTER =====
+
     public Long getId() {
         return id;
     }
@@ -44,7 +43,7 @@ public class Person {
         return dateOfBirth;
     }
 
-    // ===== SETTER =====
+
     public void setFirstName(String firstName) {
         this.firstName = firstName;
     }

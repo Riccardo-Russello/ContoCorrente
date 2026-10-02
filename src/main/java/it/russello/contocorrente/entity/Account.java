@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "account")
 public class Account {
-    // === ATTRIBUTI ===
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)     // Rende l'attributo auto incrementale
     private Long id;
@@ -29,17 +28,17 @@ public class Account {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal balance;
 
-    // === COSTRUTTORI ===
-    protected Account(){}     // Costruttore richiesto da JPA
+
+    protected Account(){}
 
     public Account(Person person, String accountNumber){
         this.person = person;
         this.accountNumber = accountNumber;
-        this.openedAt = LocalDateTime.now().withNano(0);    // Imposta i nanosecondi a 0
+        this.openedAt = LocalDateTime.now().withNano(0);
         this.balance = new BigDecimal("0.00");
     }
 
-    // === GETTER ===
+
     public Long getId() {
         return id;
     }
@@ -54,7 +53,7 @@ public class Account {
         return balance;
     }
 
-    // === SETTER ===
+
     public void setAccountNumber(String accountNumber) {
         this.accountNumber = accountNumber;
     }

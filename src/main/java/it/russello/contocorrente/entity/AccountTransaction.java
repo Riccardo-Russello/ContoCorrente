@@ -9,13 +9,11 @@ import java.time.temporal.ChronoUnit;
 @Entity
 @Table(name = "accounttransaction")
 public class AccountTransaction {
-    // === ATTRIBUTI ===
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)     // Rende l'id auto incrementale
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Più movimenti appartengono allo stesso conto
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)    // LAZY indica a JPA di rimandare il caricamento del conto associato al movimento finché non serve
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "account_id",
             nullable = false,
             updatable = false,
@@ -23,8 +21,8 @@ public class AccountTransaction {
     )
     private Account account;
 
-    @Enumerated(EnumType.STRING)                // Conserva il tipo come String
-    @Column(nullable = false, length = 10, columnDefinition = "VARCHAR(10)")      // Not null e lunghezza = 10
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10, columnDefinition = "VARCHAR(10)")
     private TransactionType type;
 
     @Column(nullable = false, precision = 15, scale = 2)
@@ -33,18 +31,17 @@ public class AccountTransaction {
     @Column(name = "occurred_at", nullable = false, columnDefinition = "DATETIME(6)")
     private LocalDateTime occurredAt;
 
-    // === COSTRUTTORI ===
-    protected AccountTransaction(){}     // Costruttore richiesto da JPA
+    protected AccountTransaction(){}
 
     public AccountTransaction(Account account, TransactionType type, BigDecimal amount){
         this.account = account;
         this.type = type;
         this.amount = amount;
         this.occurredAt = LocalDateTime.now()
-                .truncatedTo(ChronoUnit.MICROS);    // Mantiene la precisione fino ai microsecondi (es. 2026-09-25T11:13:45.123456)
+                .truncatedTo(ChronoUnit.MICROS);
     }
 
-    // === GETTER ===
+
     public Long getId() {
         return id;
     }
