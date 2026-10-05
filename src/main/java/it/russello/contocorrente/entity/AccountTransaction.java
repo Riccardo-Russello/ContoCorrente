@@ -1,6 +1,7 @@
 package it.russello.contocorrente.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -8,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "accounttransaction")
+@Getter
 public class AccountTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,20 +43,4 @@ public class AccountTransaction {
                 .truncatedTo(ChronoUnit.MICROS);
     }
 
-
-    public Long getId() {
-        return id;
-    }
-    public Account getAccount() {
-        return account;
-    }
-    public TransactionType getType() {
-        return type;
-    }
-    public BigDecimal getAmount() {
-        return amount;
-    }
-    public LocalDateTime getOccurredAt() {
-        return occurredAt;
-    }
 }

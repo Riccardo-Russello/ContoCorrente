@@ -1,8 +1,7 @@
 package it.russello.contocorrente.controller;
 
-import it.russello.contocorrente.dto.AccountCreateRequest;
-import it.russello.contocorrente.dto.AccountResponse;
-import it.russello.contocorrente.dto.AccountUpdateRequest;
+import it.russello.contocorrente.dto.*;
+import it.russello.contocorrente.entity.AccountTransaction;
 import it.russello.contocorrente.service.AccountService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,5 +47,13 @@ public class AccountController {
     public ResponseEntity<Void> delete(@PathVariable("id")Long id){
         accountService.delete(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @PostMapping("/{id}/transaction")
+    public ResponseEntity<AccountTransactionResponse> createTransaction(
+            @PathVariable("id") Long id,
+            @RequestBody AccountTransactionRequest request){
+        AccountTransactionResponse response = accountService.createTransaction(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

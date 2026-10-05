@@ -1,7 +1,9 @@
 package it.russello.contocorrente.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public class ApiException extends RuntimeException {
     private final HttpStatus status;
     private final String code;
@@ -12,10 +14,4 @@ public class ApiException extends RuntimeException {
         this.code = code;
     }
 
-    public HttpStatus getStatus() {
-      return status;
-    }
-    public String getCode() {
-      return code;
-    }
 }

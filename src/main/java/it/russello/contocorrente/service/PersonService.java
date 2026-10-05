@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Service
-@Transactional(readOnly = true)
 public class PersonService {
     private final PersonRepository personRepository;
     private final AccountRepository accountRepository;
@@ -45,7 +44,6 @@ public class PersonService {
     }
 
 
-    @Transactional
     public PersonResponse update(Long id, PersonRequest request){
         Person person = requirePerson(id);
         validate(request);
@@ -59,7 +57,7 @@ public class PersonService {
     }
 
 
-    @Transactional
+
     public void delete(Long id){
         Person person = requirePerson(id);
         if(accountRepository.existsByPerson_Id(id)){
@@ -71,12 +69,10 @@ public class PersonService {
     }
 
 
-
     private Person requirePerson(Long id) {
         return personRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Persona non trovata"));
     }
-
 
     private void validate(PersonRequest request){
         if (request == null){

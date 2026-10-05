@@ -1,12 +1,15 @@
 package it.russello.contocorrente.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account")
+@Getter
 public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)     // Rende l'attributo auto incrementale
@@ -19,12 +22,14 @@ public class Account {
             foreignKey = @ForeignKey(name = "fk_account_person"))
     private Person person;
 
+    @Setter
     @Column(name = "account_number", nullable = false, unique = true, length = 30)
     private String accountNumber;
 
     @Column(name = "opened_at", nullable = false, updatable = false, columnDefinition ="DATETIME")
     private LocalDateTime openedAt;      // senza frazioni di secondo
 
+    @Setter
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal balance;
 
@@ -38,26 +43,4 @@ public class Account {
         this.balance = new BigDecimal("0.00");
     }
 
-
-    public Long getId() {
-        return id;
-    }
-    public Person getPerson() {return person;}
-    public String getAccountNumber() {
-        return accountNumber;
-    }
-    public LocalDateTime getOpenedAt() {
-        return openedAt;
-    }
-    public BigDecimal getBalance() {
-        return balance;
-    }
-
-
-    public void setAccountNumber(String accountNumber) {
-        this.accountNumber = accountNumber;
-    }
-    public void setBalance(BigDecimal balance){     // Da usare nel Service per versamenti e prelievi
-        this.balance = balance;
-    }
 }
