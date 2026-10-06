@@ -8,8 +8,8 @@ public record PersonResponse(Long id, String firstName, String lastName, LocalDa
 
     public static PersonResponse from(Person person) {
         return new PersonResponse(person.getId(),
-                                    person.getFirstName(),
-                                    person.getLastName(),
-                                    person.getDateOfBirth());
+                person.getFirstName(),
+                person.getLastName(),
+                person.getDateOfBirth());
     }
 }

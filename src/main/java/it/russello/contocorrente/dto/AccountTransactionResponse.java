@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
 public record AccountTransactionResponse(Long id, TransactionType type,
                                          BigDecimal amount, LocalDateTime occurredAt,
                                          BigDecimal balance) {
-    public  static AccountTransactionResponse from(AccountTransaction transaction,
-                                                   BigDecimal balance) {
+    public static AccountTransactionResponse from(AccountTransaction transaction,
+                                                  BigDecimal balance) {
         return new AccountTransactionResponse(transaction.getId(),
                 transaction.getType(),
                 transaction.getAmount(),

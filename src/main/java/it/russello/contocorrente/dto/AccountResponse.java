@@ -10,7 +10,7 @@ public record AccountResponse(Long id,
                               String accountNumber,
                               LocalDateTime openedAt,
                               BigDecimal balance) {
-    public static AccountResponse from(Account account){
+    public static AccountResponse from(Account account) {
         return new AccountResponse(account.getId(),
                 account.getPerson().getId(),
                 account.getAccountNumber(),

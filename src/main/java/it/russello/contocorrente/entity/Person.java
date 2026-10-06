@@ -27,7 +27,9 @@ public class Person {
     private LocalDate dateOfBirth;
 
 
-    protected Person() {}
+    protected Person() {
+    }
+
     public Person(String firstName, String lastName,
                   LocalDate dateOfBirth) {
         this.firstName = firstName;

@@ -33,9 +33,10 @@ public class AccountTransaction {
     @Column(name = "occurred_at", nullable = false, columnDefinition = "DATETIME(6)")
     private LocalDateTime occurredAt;
 
-    protected AccountTransaction(){}
+    protected AccountTransaction() {
+    }
 
-    public AccountTransaction(Account account, TransactionType type, BigDecimal amount){
+    public AccountTransaction(Account account, TransactionType type, BigDecimal amount) {
         this.account = account;
         this.type = type;
         this.amount = amount;

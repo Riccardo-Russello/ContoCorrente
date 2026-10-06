@@ -10,7 +10,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @ControllerAdvice
 public class ApiExceptionHandler {
 
-    public record ErrorResponse(String code, String message){}
+    public record ErrorResponse(String code, String message) {
+    }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException exception) {

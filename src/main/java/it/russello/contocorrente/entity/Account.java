@@ -26,7 +26,7 @@ public class Account {
     @Column(name = "account_number", nullable = false, unique = true, length = 30)
     private String accountNumber;
 
-    @Column(name = "opened_at", nullable = false, updatable = false, columnDefinition ="DATETIME")
+    @Column(name = "opened_at", nullable = false, updatable = false, columnDefinition = "DATETIME")
     private LocalDateTime openedAt;      // senza frazioni di secondo
 
     @Setter
@@ -34,9 +34,10 @@ public class Account {
     private BigDecimal balance;
 
 
-    protected Account(){}
+    protected Account() {
+    }
 
-    public Account(Person person, String accountNumber){
+    public Account(Person person, String accountNumber) {
         this.person = person;
         this.accountNumber = accountNumber;
         this.openedAt = LocalDateTime.now().withNano(0);

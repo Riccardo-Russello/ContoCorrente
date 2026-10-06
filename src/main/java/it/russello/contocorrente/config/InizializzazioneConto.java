@@ -23,9 +23,9 @@ public class InizializzazioneConto implements CommandLineRunner {
 
     @Override
     @Transactional
-    public void run(String... args){
+    public void run(String... args) {
         String accountNumber = "CC000001";
-        if(accountRepository.existsByAccountNumber(accountNumber)){
+        if (accountRepository.existsByAccountNumber(accountNumber)) {
             return;
         }
         Person person = new Person("Mario", "Rossi",
