@@ -2,13 +2,14 @@ package it.russello.contocorrente.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "person")
-@Getter
+@Getter @NoArgsConstructor
 public class Person {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,9 +27,6 @@ public class Person {
     @Column(name = "date_of_birth", nullable = false)
     private LocalDate dateOfBirth;
 
-
-    protected Person() {
-    }
 
     public Person(String firstName, String lastName,
                   LocalDate dateOfBirth) {

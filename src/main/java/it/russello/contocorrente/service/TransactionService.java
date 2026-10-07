@@ -1,10 +1,13 @@
 package it.russello.contocorrente.service;
 
 import it.russello.contocorrente.dto.AccountTransactionRequest;
+import it.russello.contocorrente.dto.AccountTransactionRequest.TransferRequest;
+import it.russello.contocorrente.dto.AccountTransactionResponse.TransferResponse;
 import it.russello.contocorrente.dto.AccountTransactionResponse;
 import it.russello.contocorrente.dto.TransactionListResponse;
 import it.russello.contocorrente.entity.Account;
 import it.russello.contocorrente.entity.AccountTransaction;
+import it.russello.contocorrente.entity.TransactionType;
 import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.repository.AccountRepository;
 import it.russello.contocorrente.repository.AccountTransactionRepository;
@@ -55,6 +58,43 @@ public class TransactionService {
         AccountTransaction transaction = new AccountTransaction(savedAccount, request.type(), amount);
         AccountTransaction savedTransaction = accountTransactionRepository.saveAndFlush(transaction);
         return AccountTransactionResponse.from(savedTransaction, savedAccount.getBalance());
+    }
+
+    @Transactional
+    public TransferResponse transfer(Long sourceAccountId, TransferRequest request) {
+        if(request == null){
+            throw invalidTransaction("Corpo della richiesta obbligatorio");
+        }
+        Long destinationAccountId = request.destinationAccountId();
+        if(sourceAccountId == null || sourceAccountId <= 0 || destinationAccountId == null || destinationAccountId <= 0){
+            throw invalidTransaction("Id dei conti devono essere positivi");
+        }
+        BigDecimal amount = validateAmount(request.amount());
+        Account source = requireAccount(sourceAccountId);
+        Account destination = requireAccount(destinationAccountId);
+
+        if(source.getBalance().compareTo(amount) < 0){
+            throw new ApiException(HttpStatus.CONFLICT, "INSUFFICIENT_BALANCE", "Saldo insufficiente al trasferimento");
+        }
+         BigDecimal sourceBalance =  source.getBalance().subtract(amount);
+        BigDecimal destinationBalance = destination.getBalance().add(amount);
+
+        if(destinationBalance.compareTo(MAX_MONEY) > 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "BALANCE_LIMIT:EXCEEDED", "Il trasferimento supera la capacità del saldo");
+        }
+        source.setBalance(sourceBalance);
+        destination.setBalance(destinationBalance);
+
+        AccountTransaction withdrawal = new AccountTransaction(source, TransactionType.WITHDRAWAL, amount);
+        AccountTransaction deposit = new AccountTransaction(destination, TransactionType.DEPOSIT, amount);
+        AccountTransaction savedWithdrawal = accountTransactionRepository.save(withdrawal);
+        AccountTransaction savedDeposit = accountTransactionRepository.save(deposit);
+
+        accountTransactionRepository.flush();
+        return new TransferResponse(source.getId(), destination.getId(),
+                AccountTransactionResponse.from(savedWithdrawal, sourceBalance),
+                AccountTransactionResponse.from(savedDeposit, destinationBalance));
+
     }
 
     public List<TransactionListResponse> getLastFiveTransactions(Long accountId) {

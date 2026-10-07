@@ -17,4 +17,9 @@ public record AccountTransactionResponse(Long id, TransactionType type,
                 transaction.getOccurredAt(),
                 balance);
     }
+
+    public record TransferResponse(Long sourceAccountId,
+                                   Long destinationAccountId,
+                                   AccountTransactionResponse withdrawal,
+                                   AccountTransactionResponse deposit) {}
 }

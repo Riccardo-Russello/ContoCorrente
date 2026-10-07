@@ -2,6 +2,7 @@ package it.russello.contocorrente.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
@@ -9,7 +10,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "account")
-@Getter
+@Getter @NoArgsConstructor
 public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)     // Rende l'attributo auto incrementale
@@ -33,9 +34,6 @@ public class Account {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal balance;
 
-
-    protected Account() {
-    }
 
     public Account(Person person, String accountNumber) {
         this.person = person;
