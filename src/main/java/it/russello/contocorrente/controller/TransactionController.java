@@ -29,10 +29,10 @@ public class TransactionController {
     }
 
     @PostMapping("/transfer")
-    public ResponseEntity<TransferResponse> transfer(
+    public ResponseEntity<AccountTransactionResponse> transfer(
             @PathVariable("id") Long sourceAccountId,
             @RequestBody TransferRequest request){
-        TransferResponse response = transactionService.transfer(sourceAccountId, request);
+        AccountTransactionResponse response = transactionService.transfer(sourceAccountId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

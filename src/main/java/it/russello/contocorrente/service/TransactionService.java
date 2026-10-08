@@ -29,15 +29,26 @@ public class TransactionService {
 
     @Transactional
     public AccountTransactionResponse createTransaction(Long accountId, AccountTransactionRequest request) {     // createAccountTransaction (spostare nel service separato)
-        Account account = requireAccount(accountId);
         if (request == null) {
             throw invalidTransaction("Corpo della richiesta è obbligatorio");
         }
-        if (request.type() == null) {
-            throw invalidTransaction("Tipo obbligatorio: DEPOSIT o WITHDRAWAL");
+        if(accountId == null || accountId <= 0){
+            throw invalidTransaction("Id del conto deve essere positivo");
         }
+        if (request.type() == null) {
+            throw invalidTransaction("Tipo obbligatorio: DEPOSIT, WITHDRAWAL o TRANSFER");
+        }
+        if(request.type() == TransactionType.TRANSFER) {
+            return transfer(accountId, new TransferRequest(request.to(), request.amount()));
+        }
+        if(request.to() != null){
+            throw invalidTransaction("Destinatario ammesso solo per TRANFER");
+        }
+
         BigDecimal amount = validateAmount(request.amount());
+        Account account = requireAccount(accountId);
         BigDecimal newBalance;
+
         switch (request.type()) {
             case DEPOSIT -> {
                 newBalance = account.getBalance().add(amount);
@@ -53,21 +64,25 @@ public class TransactionService {
             }
             default -> throw invalidTransaction("Movimento non valido");
         }
+
         account.setBalance(newBalance);
-        Account savedAccount = accountRepository.saveAndFlush(account);
+        Account savedAccount = accountRepository.save(account);
         AccountTransaction transaction = new AccountTransaction(savedAccount, request.type(), amount);
         AccountTransaction savedTransaction = accountTransactionRepository.saveAndFlush(transaction);
-        return AccountTransactionResponse.from(savedTransaction, savedAccount.getBalance());
+        return AccountTransactionResponse.from(savedTransaction, savedAccount.getBalance(), null);
     }
 
     @Transactional
-    public TransferResponse transfer(Long sourceAccountId, TransferRequest request) {
+    public AccountTransactionResponse transfer(Long sourceAccountId, TransferRequest request) {
         if(request == null){
             throw invalidTransaction("Corpo della richiesta obbligatorio");
         }
         Long destinationAccountId = request.destinationAccountId();
         if(sourceAccountId == null || sourceAccountId <= 0 || destinationAccountId == null || destinationAccountId <= 0){
             throw invalidTransaction("Id dei conti devono essere positivi");
+        }
+        if(sourceAccountId.equals(destinationAccountId)){
+            throw invalidTransaction("Id dei conti sorgente e destinazione devono essere diversi");
         }
         BigDecimal amount = validateAmount(request.amount());
         Account source = requireAccount(sourceAccountId);
@@ -76,31 +91,24 @@ public class TransactionService {
         if(source.getBalance().compareTo(amount) < 0){
             throw new ApiException(HttpStatus.CONFLICT, "INSUFFICIENT_BALANCE", "Saldo insufficiente al trasferimento");
         }
-         BigDecimal sourceBalance =  source.getBalance().subtract(amount);
+        BigDecimal sourceBalance =  source.getBalance().subtract(amount);
         BigDecimal destinationBalance = destination.getBalance().add(amount);
 
         if(destinationBalance.compareTo(MAX_MONEY) > 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "BALANCE_LIMIT:EXCEEDED", "Il trasferimento supera la capacità del saldo");
+            throw new ApiException(HttpStatus.CONFLICT, "BALANCE_LIMIT_EXCEEDED", "Il trasferimento supera la capacità del saldo");
         }
         source.setBalance(sourceBalance);
         destination.setBalance(destinationBalance);
 
-        AccountTransaction withdrawal = new AccountTransaction(source, TransactionType.WITHDRAWAL, amount);
-        AccountTransaction deposit = new AccountTransaction(destination, TransactionType.DEPOSIT, amount);
-        AccountTransaction savedWithdrawal = accountTransactionRepository.save(withdrawal);
-        AccountTransaction savedDeposit = accountTransactionRepository.save(deposit);
-
-        accountTransactionRepository.flush();
-        return new TransferResponse(source.getId(), destination.getId(),
-                AccountTransactionResponse.from(savedWithdrawal, sourceBalance),
-                AccountTransactionResponse.from(savedDeposit, destinationBalance));
-
+        AccountTransaction transaction = new AccountTransaction(source, destination, amount);
+        AccountTransaction savedTransaction = accountTransactionRepository.save(transaction);
+        return AccountTransactionResponse.from(savedTransaction, sourceBalance, destinationBalance);
     }
 
     public List<TransactionListResponse> getLastFiveTransactions(Long accountId) {
         requireAccount(accountId);
         return accountTransactionRepository
-                .findTop5ByAccount_idOrderByOccurredAtDescIdDesc(accountId)
+                .findTop5ByAccount_IdOrDestinationAccount_IdOrderByOccurredAtDescIdDesc(accountId, accountId)
                 .stream()
                 .map(TransactionListResponse::from)
                 .toList();

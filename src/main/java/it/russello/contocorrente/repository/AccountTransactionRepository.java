@@ -8,8 +8,11 @@ import java.util.List;
 public interface AccountTransactionRepository extends JpaRepository<AccountTransaction, Long> {
 
     List<AccountTransaction>
-    findTop5ByAccount_idOrderByOccurredAtDescIdDesc(Long accountId);
+    findTop5ByAccount_IdOrDestinationAccount_IdOrderByOccurredAtDescIdDesc(Long sourceAccountId, Long destinationAccountId);
 
-    boolean existsByAccount_Id(Long accountId);
+    boolean existsByAccount_IdOrDestinationAccount_Id(Long accountId, Long destinationAccountId);
 
+    default boolean existsByAccountId(Long accountId) {
+        return existsByAccount_IdOrDestinationAccount_Id(accountId, accountId);
+    }
 }

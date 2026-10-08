@@ -24,6 +24,11 @@ public class AccountTransaction {
     )
     private Account account;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destinationAccountId", updatable = false,
+                foreignKey = @ForeignKey(name = "fk_transaction_destination"))
+    private Account destinationAccount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, columnDefinition = "VARCHAR(10)")
     private TransactionType type;
@@ -41,6 +46,11 @@ public class AccountTransaction {
         this.amount = amount;
         this.occurredAt = LocalDateTime.now()
                 .truncatedTo(ChronoUnit.MICROS);
+    }
+
+    public AccountTransaction(Account source, Account destination, BigDecimal amount) {
+        this(source, TransactionType.TRANSFER, amount);
+        this.destinationAccount = destination;
     }
 
 }
