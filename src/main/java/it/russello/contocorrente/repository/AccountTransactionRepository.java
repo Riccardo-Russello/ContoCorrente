@@ -12,7 +12,7 @@ public interface AccountTransactionRepository extends JpaRepository<AccountTrans
 
     boolean existsByAccount_IdOrDestinationAccount_Id(Long accountId, Long destinationAccountId);
 
-    default boolean existsByAccountId(Long accountId) {
+    default boolean existsByAccount_Id(Long accountId) {
         return existsByAccount_IdOrDestinationAccount_Id(accountId, accountId);
     }
 }

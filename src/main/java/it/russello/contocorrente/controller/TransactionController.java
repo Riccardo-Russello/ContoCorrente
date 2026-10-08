@@ -3,7 +3,6 @@ package it.russello.contocorrente.controller;
 import it.russello.contocorrente.dto.AccountTransactionRequest;
 import it.russello.contocorrente.dto.AccountTransactionRequest.TransferRequest;
 import it.russello.contocorrente.dto.AccountTransactionResponse;
-import it.russello.contocorrente.dto.AccountTransactionResponse.TransferResponse;
 import it.russello.contocorrente.dto.TransactionListResponse;
 import it.russello.contocorrente.service.TransactionService;
 import lombok.RequiredArgsConstructor;

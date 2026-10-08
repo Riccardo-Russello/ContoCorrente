@@ -2,7 +2,6 @@ package it.russello.contocorrente.service;
 
 import it.russello.contocorrente.dto.AccountTransactionRequest;
 import it.russello.contocorrente.dto.AccountTransactionRequest.TransferRequest;
-import it.russello.contocorrente.dto.AccountTransactionResponse.TransferResponse;
 import it.russello.contocorrente.dto.AccountTransactionResponse;
 import it.russello.contocorrente.dto.TransactionListResponse;
 import it.russello.contocorrente.entity.Account;
