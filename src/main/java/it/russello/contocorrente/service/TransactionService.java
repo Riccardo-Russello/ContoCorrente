@@ -1,9 +1,10 @@
 package it.russello.contocorrente.service;
 
 import it.russello.contocorrente.dto.AccountTransactionRequest;
-import it.russello.contocorrente.dto.AccountTransactionRequest.TransferRequest;
+import it.russello.contocorrente.dto.TransferRequest;
 import it.russello.contocorrente.dto.AccountTransactionResponse;
 import it.russello.contocorrente.dto.TransactionListResponse;
+import it.russello.contocorrente.dto.TransferResponse;
 import it.russello.contocorrente.entity.Account;
 import it.russello.contocorrente.entity.AccountTransaction;
 import it.russello.contocorrente.entity.TransactionType;
@@ -38,7 +39,15 @@ public class TransactionService {
             throw invalidTransaction("Tipo obbligatorio: DEPOSIT, WITHDRAWAL o TRANSFER");
         }
         if(request.type() == TransactionType.TRANSFER) {
-            return transfer(accountId, new TransferRequest(request.to(), request.amount()));
+            TransferResponse response = transfer(accountId, new TransferRequest(request.to(), request.amount()));
+            return new AccountTransactionResponse(response.id(),
+                    response.type(),
+                    response.amount(),
+                    response.occurredAt(),
+                    response.balance(),
+                    response.sourceAccountId(),
+                    response.destinationAccountId(),
+                    response.destinationBalance());
         }
         if(request.to() != null){
             throw invalidTransaction("Destinatario ammesso solo per TRANFER");
@@ -72,7 +81,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public AccountTransactionResponse transfer(Long sourceAccountId, TransferRequest request) {
+    public TransferResponse transfer(Long sourceAccountId, TransferRequest request) {
         if(request == null){
             throw invalidTransaction("Corpo della richiesta obbligatorio");
         }
@@ -101,7 +110,7 @@ public class TransactionService {
 
         AccountTransaction transaction = new AccountTransaction(source, destination, amount);
         AccountTransaction savedTransaction = accountTransactionRepository.save(transaction);
-        return AccountTransactionResponse.from(savedTransaction, sourceBalance, destinationBalance);
+        return TransferResponse.from(savedTransaction, sourceBalance, destinationBalance);
     }
 
     public List<TransactionListResponse> getLastFiveTransactions(Long accountId) {
