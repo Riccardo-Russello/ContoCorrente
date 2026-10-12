@@ -1,12 +1,8 @@
 package it.russello.contocorrente.controller;
 
-import it.russello.contocorrente.dto.AccountTransactionRequest;
-import it.russello.contocorrente.dto.AccountTransactionRequest.TransferRequest;
-import it.russello.contocorrente.dto.AccountTransactionResponse;
-import it.russello.contocorrente.dto.TransactionListResponse;
+import it.russello.contocorrente.dto.*;
 import it.russello.contocorrente.service.TransactionService;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,10 +24,10 @@ public class TransactionController {
     }
 
     @PostMapping("/transfer")
-    public ResponseEntity<AccountTransactionResponse> transfer(
+    public ResponseEntity<TransferResponse> transfer(
             @PathVariable("id") Long sourceAccountId,
             @RequestBody TransferRequest request){
-        AccountTransactionResponse response = transactionService.transfer(sourceAccountId, request);
+        TransferResponse response = transactionService.transfer(sourceAccountId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

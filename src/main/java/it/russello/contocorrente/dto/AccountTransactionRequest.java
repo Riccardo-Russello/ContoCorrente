@@ -6,6 +6,4 @@ import java.math.BigDecimal;
 
 public record AccountTransactionRequest(BigDecimal amount,
                                         TransactionType type,
-                                        Long to) {
-    public record TransferRequest(Long destinationAccountId, BigDecimal amount) {}
-}
+                                        Long to) {}
