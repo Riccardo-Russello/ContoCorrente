@@ -6,6 +6,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ControllerAdvice
 public class ApiExceptionHandler {
@@ -50,5 +51,11 @@ public class ApiExceptionHandler {
                         "INTERNAL_ERROR",
                         "Errore interno durante l'operazione"
                 ));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataConflict(DataIntegrityViolationException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("DATA_CONFLICT", "Operazione incompatibile con i vncoli del database"));
     }
 }

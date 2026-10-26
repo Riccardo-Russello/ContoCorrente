@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
 
@@ -26,6 +27,15 @@ public class Person {
     @Setter
     @Column(name = "date_of_birth", nullable = false)
     private LocalDate dateOfBirth;
+
+    @Setter
+    @Column(name = "username", nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Setter
+    @JsonIgnore
+    @Column(name = "password", nullable = false, length = 50)
+    private String password;
 
 
     public Person(String firstName, String lastName,
