@@ -10,6 +10,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import java.time.LocalDate;
 
@@ -37,7 +38,9 @@ public class PersonControllerIT {
                         {
                             "firstName" : "Mario",
                             "lastName" : "Rossi",
-                            "dateOfBirth" : "1990-05-15"
+                            "dateOfBirth" : "1990-05-15",
+                            "username" : "mario.rossi",
+                            "password" : "passwmario"
                         }
                         """))
                 .andExpect(status().isCreated())
@@ -56,13 +59,18 @@ public class PersonControllerIT {
         assertEquals(saved.getFirstName(), "Mario");
         assertEquals(saved.getLastName(), "Rossi");
         assertEquals(saved.getDateOfBirth(), LocalDate.of(1990, 5, 15));
+        assertEquals("mario.rossi", saved.getUsername());
+        assertEquals("passwmario", saved.getPassword());
     }
 
     @Test
     void findAllPerson() throws Exception{
-        Person person = personRepository.saveAndFlush(new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+        Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        person = personRepository.saveAndFlush(person);
         Long id = person.getId();
-        mockMvc.perform(get("/api/person"))
+        mockMvc.perform(get("/api/person").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(id))
@@ -73,11 +81,14 @@ public class PersonControllerIT {
 
     @Test
     void findPersonById() throws Exception{
-        Person person = personRepository.saveAndFlush(new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+        Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        person = personRepository.saveAndFlush(person);
         Long id = person.getId();
         entityManager.clear();
 
-        mockMvc.perform(get("/api/person/{id}", id))
+        mockMvc.perform(get("/api/person/{id}", id).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
@@ -87,12 +98,15 @@ public class PersonControllerIT {
 
     @Test
     void updatePerson() throws Exception{
-        Person person = personRepository.saveAndFlush(new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+        Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        person = personRepository.saveAndFlush(person);
         Long id = person.getId();
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        mockMvc.perform(put("/api/person/{id}", id)
+        mockMvc.perform(put("/api/person/{id}", id).with(jwt())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {
@@ -114,16 +128,21 @@ public class PersonControllerIT {
         assertEquals("Anna", updated.getFirstName());
         assertEquals("Verdi", updated.getLastName());
         assertEquals(LocalDate.of(1995, 2, 10), updated.getDateOfBirth());
+        assertEquals("mario.rossi", updated.getUsername());
+        assertEquals("passwmario", updated.getPassword());
     }
 
     @Test
     void deletePerson() throws Exception{
-        Person person = personRepository.saveAndFlush(new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+        Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        person = personRepository.saveAndFlush(person);
         Long id = person.getId();
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        mockMvc.perform(delete("/api/person/{id}", id))
+        mockMvc.perform(delete("/api/person/{id}", id).with(jwt()))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
         entityManager.flush();

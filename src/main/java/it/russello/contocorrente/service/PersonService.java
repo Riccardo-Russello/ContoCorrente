@@ -94,7 +94,7 @@ public class PersonService {
         }
     }
     private void validateCredential(String username, String password) {
-        if(username == null || !username.matches("[a-zA-Z0-9]{3,30}")){
+        if(username == null || !username.matches("[a-zA-Z0-9.]{3,30}")){
             throw invalidPerson("Username da 3 a 30 caratteri(lettere e numeri)");
         }
         if(password == null || password.isBlank() || password.length() < 8 || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72){

@@ -19,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -51,8 +52,10 @@ public class TransactionControllerIT {
 
     @BeforeEach
     void setUp(){
-        Person person = personRepository.saveAndFlush(
-                new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+        Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        personRepository.saveAndFlush(person);
         source = new Account(person, "ACC-001");
         source.setBalance(new BigDecimal("100.00"));
         accountRepository.saveAndFlush(source);
@@ -66,7 +69,7 @@ public class TransactionControllerIT {
     @CsvSource({"DEPOSIT, 125.00", "WITHDRAWAL, 75.00"})
     void createTransaction(String type, BigDecimal expectedBalance) throws Exception {
         long counterBefore = transactionRepository.count();
-        var response = mockMvc.perform(post("/api/account/{id}/transaction", source.getId())
+        var response = mockMvc.perform(post("/api/account/{id}/transaction", source.getId()).with(jwt())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -81,7 +84,7 @@ public class TransactionControllerIT {
                 .andExpect(jsonPath("$.occurredAt").isNotEmpty())
                 .andExpect(jsonPath("$.sourceAccountId").value(source.getId()))
                 .andExpect(jsonPath("$.balance").value(expectedBalance.doubleValue()))
-                .andExpect(jsonPath("$.destinationAcccountId").doesNotExist())
+                .andExpect(jsonPath("$.destinationAccountId").doesNotExist())
                 .andExpect(jsonPath("$.destinationBalance").doesNotExist())
                 .andReturn();
         entityManager.flush();
@@ -116,7 +119,7 @@ public class TransactionControllerIT {
                       "amount": 25.00
                   }
                   """.formatted(destination.getId());
-        var response = mockMvc.perform(post(url, source.getId())
+        var response = mockMvc.perform(post(url, source.getId()).with(jwt())
                                 .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
@@ -161,7 +164,7 @@ public class TransactionControllerIT {
                         .thenComparing(AccountTransaction::getId)
                         .reversed());
         entityManager.clear();
-        var result = mockMvc.perform(get("/api/account/{id}/transaction", source.getId()))
+        var result = mockMvc.perform(get("/api/account/{id}/transaction", source.getId()).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(5));
         for(int i=0; i<5; i++){
@@ -185,7 +188,7 @@ public class TransactionControllerIT {
 
     @Test
     void getLastFiveTransactionsEmpty() throws Exception{
-        mockMvc.perform(get("/api/account/{id}/transaction", source.getId()))
+        mockMvc.perform(get("/api/account/{id}/transaction", source.getId()).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
     }
