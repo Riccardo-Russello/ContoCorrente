@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -37,6 +38,7 @@ public class PersonService {
         return PersonResponse.from(savedPerson);
     }
 
+    @PreAuthorize("hasRole('admin')")
     public List<PersonResponse> findAll() {
         return personRepository.findAll()
                 .stream()
@@ -44,10 +46,12 @@ public class PersonService {
                 .toList();
     }
 
+    @PreAuthorize("hasRole('admin')")
     public PersonResponse findById(Long id) {
         return PersonResponse.from(requirePerson(id));
     }
 
+    @PreAuthorize("hasRole('admin')")
     public PersonResponse update(Long id, PersonRequest request) {
         Person person = requirePerson(id);
         validate(request);
@@ -63,6 +67,7 @@ public class PersonService {
         return PersonResponse.from(savedPerson);
     }
 
+    @PreAuthorize("hasRole('admin')")
     public void delete(Long id) {
         Person person = requirePerson(id);
         if (accountRepository.existsByPerson_Id(id)) {

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 
 @ControllerAdvice
 public class ApiExceptionHandler {
@@ -42,6 +43,12 @@ public class ApiExceptionHandler {
                 "Il parametro " + exception.getName()
                         + " ha un formato non valido"
         ));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("ACCESS_DENIED", "Non ha i permessi per eseguire l'operazione"));
     }
 
     @ExceptionHandler(Exception.class)

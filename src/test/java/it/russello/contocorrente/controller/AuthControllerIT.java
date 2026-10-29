@@ -16,6 +16,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,10 +35,13 @@ public class AuthControllerIT {
     private PersonRepository personRepository;
     @Autowired
     private JwtEncoder jwtEncoder;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private void savePerson(){
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
-        person.setPassword("passwmario");
+        person.setPassword(passwordEncoder.encode(("passwmario"));
         personRepository.saveAndFlush(person);
     }
     private String loginAndGetToken() throws Exception{

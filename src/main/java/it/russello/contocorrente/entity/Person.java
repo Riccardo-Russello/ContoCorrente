@@ -34,8 +34,13 @@ public class Person {
 
     @Setter
     @JsonIgnore
-    @Column(name = "password", nullable = false, length = 50)
+    @Column(name = "password", nullable = false, length = 100)
     private String password;
+
+    @Setter
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 10)
+    private Role role = Role.user;
 
 
     public Person(String firstName, String lastName,

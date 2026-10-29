@@ -13,12 +13,14 @@ import it.russello.contocorrente.repository.PersonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('admin')")
 public class AccountService {
     private final AccountRepository accountRepository;
     private final PersonRepository personRepository;

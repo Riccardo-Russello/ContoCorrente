@@ -16,7 +16,7 @@ public class PersonUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username){
         var person = personRepository.findByUsername(username)
                 .orElseThrow(()->new UsernameNotFoundException("Utente non trovato"));
-        return User.withUsername(username).password(person.getPassword()).roles("USER").build();
+        return User.withUsername(username).password(person.getPassword()).roles(person.getRole().name()).build();
     }
 
 }

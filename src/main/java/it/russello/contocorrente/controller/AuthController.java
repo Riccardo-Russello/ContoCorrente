@@ -14,6 +14,8 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.GrantedAuthority;
+import java.util.List;
 
 import java.time.Instant;
 
@@ -37,19 +39,23 @@ public class AuthController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_LOGIN_DATA", "Username e password obbligatori");
         }
         String username;
+        List<String> authorities;
         try{
             var authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(
                             request.username(),
                             request.password()));
             username = authentication.getName();
+            authorities = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .toList();
         }catch(AuthenticationException e){
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Username o password non corretti");
         }
         Instant now = Instant.now();
         long expiresIn = 3600;
         var claims = JwtClaimsSet.builder().issuer(issuer).subject(username)
-                .issuedAt(now).expiresAt(now.plusSeconds(expiresIn)).build();
+                .issuedAt(now).expiresAt(now.plusSeconds(expiresIn)).claim("authorities", authorities).build();
         var header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new LoginResponse(token, "Bearer", expiresIn);
