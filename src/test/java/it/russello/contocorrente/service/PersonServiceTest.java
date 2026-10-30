@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -34,6 +35,8 @@ public class PersonServiceTest {
     private PersonRepository personRepository;
     @Mock
     private AccountRepository accountRepository;
+    @Mock
+    private PasswordEncoder passwordEncoder;
     @InjectMocks
     private PersonService personService;
 
@@ -47,6 +50,7 @@ public class PersonServiceTest {
     void createValidPerson(){
         Person saved = person(1L);
         when(personRepository.save(any(Person.class))).thenReturn(saved);
+        when(passwordEncoder.encode("passwmario")).thenReturn("passwmario");
         PersonResponse response = personService.create(validRequest());
         assertEquals(new PersonResponse(1L, "Mario", "Rossi", BIRTH_DATE), response);
 
@@ -58,6 +62,10 @@ public class PersonServiceTest {
         assertEquals("Mario", submitted.getFirstName());
         assertEquals("Rossi", submitted.getLastName());
         assertEquals(BIRTH_DATE, submitted.getDateOfBirth());
+        assertEquals("mario.rossi", submitted.getUsername());
+        assertEquals("passwmario", submitted.getPassword());
+        verify(personRepository).existsByUsername("mario.rossi");
+        verify(passwordEncoder).encode("passwmario");
         verifyNoInteractions(accountRepository);
     }
 
@@ -71,10 +79,21 @@ public class PersonServiceTest {
     }
 
     @Test
+    void createWithExistingUsername(){
+        when(personRepository.existsByUsername("mario.rossi")).thenReturn(true);
+        ApiException exception = assertThrows(ApiException.class, () -> personService.create(validRequest()));
+        assertEquals(HttpStatus.CONFLICT, exception.getStatus());
+        assertEquals("USERNAME_ALREADY_EXISTS", exception.getCode());
+        verify(personRepository, never()).save(any(Person.class));
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
     void createNames30CharAndBirthDateToday(){
         LocalDate today = LocalDate.now();
-        PersonRequest request = new PersonRequest("a".repeat(30),"b".repeat(30), today);
+        PersonRequest request = new PersonRequest("a".repeat(30),"b".repeat(30), today, "more30.char", "passwmario");
         when(personRepository.save(any(Person.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(passwordEncoder.encode("passwmario")).thenReturn("passwmario");
         PersonResponse response = personService.create(request);
 
         assertEquals(request.firstName(), response.firstName());
@@ -123,7 +142,7 @@ public class PersonServiceTest {
     @Test
     void updateExistingPerson(){
         Person existing = person(1L);
-        PersonRequest request = new PersonRequest("Luigi", "Verdi", LocalDate.of(1988, 3, 20));
+        PersonRequest request = new PersonRequest("Luigi", "Verdi", LocalDate.of(1988, 3, 20), null, null);
 
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(personRepository.save(existing)).thenReturn(existing);
@@ -146,6 +165,15 @@ public class PersonServiceTest {
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
         verify(personRepository, never()).save(any(Person.class));
         verifyNoMoreInteractions(accountRepository);
+    }
+
+    @Test
+    void updateMustNotChangeCredentials(){
+        Person existing = person(1L);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
+        ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, validRequest()));
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        verify(personRepository, never()).save(any(Person.class));
     }
 
     @ParameterizedTest
@@ -205,24 +233,27 @@ public class PersonServiceTest {
     }
 
     private static PersonRequest validRequest(){
-        return new PersonRequest("Mario", "Rossi", BIRTH_DATE);
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
+    }
+    private static PersonRequest validUpdateRequest(){
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, null, null);
     }
     private static void assertApiError(ApiException exception, HttpStatus status, String code){
         assertEquals(status, exception.getStatus());
         assertEquals(code, exception.getCode());
     }
     static Stream<PersonRequest> invalidRequest(){
-        return Stream.of((PersonRequest)null,
-                new PersonRequest(null, "Rossi", BIRTH_DATE),
-                new PersonRequest("", "Rossi", BIRTH_DATE),
-                new PersonRequest("   ", "Rossi", BIRTH_DATE),
-                new PersonRequest("a".repeat(31), "Rossi", BIRTH_DATE),
-                new PersonRequest("Mario", null, BIRTH_DATE),
-                new PersonRequest("Mario", "", BIRTH_DATE),
-                new PersonRequest("Mario", "   ", BIRTH_DATE),
-                new PersonRequest("Mario", "a".repeat(31), BIRTH_DATE),
-                new PersonRequest("Mario", "Rossi", null),
-                new PersonRequest("Mario", "Rossi", LocalDate.now().plusDays(1))
-                );
+        return Stream.of(
+                (PersonRequest) null,
+                new PersonRequest(null, "Rossi", BIRTH_DATE, null, null),
+                new PersonRequest("", "Rossi", BIRTH_DATE, null, null),
+                new PersonRequest("   ", "Rossi", BIRTH_DATE, null, null),
+                new PersonRequest("a".repeat(31), "Rossi", BIRTH_DATE, null, null),
+                new PersonRequest("Mario", null, BIRTH_DATE, null, null),
+                new PersonRequest("Mario", "", BIRTH_DATE, null, null),
+                new PersonRequest("Mario", "   ", BIRTH_DATE, null, null),
+                new PersonRequest("Mario", "a".repeat(31), BIRTH_DATE, null, null),
+                new PersonRequest("Mario", "Rossi", null, null, null),
+                new PersonRequest("Mario", "Rossi", LocalDate.now().plusDays(1), null, null));
     }
 }

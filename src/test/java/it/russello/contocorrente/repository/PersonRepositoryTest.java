@@ -24,6 +24,8 @@ class PersonRepositoryTest {
     @Test
     void saveReadPersonFromDatabase(){
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
         Person saved = personRepository.saveAndFlush(person);
         Long id = saved.getId();
         assertNotNull(id);
@@ -35,6 +37,8 @@ class PersonRepositoryTest {
         assertEquals("Mario",  found.getFirstName());
         assertEquals("Rossi", found.getLastName());
         assertEquals(LocalDate.of(1990, 5, 15), found.getDateOfBirth());
+        assertEquals("mario.rossi", found.getUsername());
+        assertEquals("passwmario", found.getPassword());
 
     }
 }

@@ -9,7 +9,10 @@ import it.russello.contocorrente.repository.PersonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -18,15 +21,24 @@ import java.util.List;
 public class PersonService {
     private final PersonRepository personRepository;
     private final AccountRepository accountRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public PersonResponse create(PersonRequest request) {
         validate(request);
+        validateCredential(request.username(), request.password());
+        if(personRepository.existsByUsername(request.username())) {
+            throw  new ApiException(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "Username già utilizzato");
+        }
+
         Person person = new Person(request.firstName(), request.lastName(), request.dateOfBirth());
+        person.setUsername(request.username());
+        person.setPassword(passwordEncoder.encode(request.password()));
 
         Person savedPerson = personRepository.save(person);
         return PersonResponse.from(savedPerson);
     }
 
+    @PreAuthorize("hasRole('admin')")
     public List<PersonResponse> findAll() {
         return personRepository.findAll()
                 .stream()
@@ -34,13 +46,18 @@ public class PersonService {
                 .toList();
     }
 
+    @PreAuthorize("hasRole('admin')")
     public PersonResponse findById(Long id) {
         return PersonResponse.from(requirePerson(id));
     }
 
+    @PreAuthorize("hasRole('admin')")
     public PersonResponse update(Long id, PersonRequest request) {
         Person person = requirePerson(id);
         validate(request);
+        if(request.username() != null || request.password() != null) {
+            throw invalidPerson("Questo endpoint aggiorna solo i dati anagrafici");
+        }
 
         person.setFirstName(request.firstName());
         person.setLastName(request.lastName());
@@ -50,6 +67,7 @@ public class PersonService {
         return PersonResponse.from(savedPerson);
     }
 
+    @PreAuthorize("hasRole('admin')")
     public void delete(Long id) {
         Person person = requirePerson(id);
         if (accountRepository.existsByPerson_Id(id)) {
@@ -79,6 +97,15 @@ public class PersonService {
         if (request.dateOfBirth().isAfter(LocalDate.now())) {
             throw invalidPerson("La data di nascita non può essere futura");
         }
+    }
+    private void validateCredential(String username, String password) {
+        if(username == null || !username.matches("[a-zA-Z0-9.]{3,30}")){
+            throw invalidPerson("Username da 3 a 30 caratteri(lettere e numeri)");
+        }
+        if(password == null || password.isBlank() || password.length() < 8 || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72){
+            throw invalidPerson("Password deve essere di almeno 8 caratteri e non più di 72 byte UTF-8;");
+        }
+
     }
 
     private void validateName(String value, String field) {

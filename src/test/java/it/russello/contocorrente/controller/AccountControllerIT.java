@@ -14,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,14 +39,16 @@ public class AccountControllerIT {
     private Person person;
     @BeforeEach
     void setUp(){
-        person =personRepository.saveAndFlush(
-                new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+        person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        personRepository.saveAndFlush(person);
     }
 
     @Test
     void createAccount() throws Exception {
         long counterBefore = accountRepository.count();
-        var response = mockMvc.perform(post("/api/account")
+        var response = mockMvc.perform(post("/api/account").with(jwt())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
@@ -76,7 +79,7 @@ public class AccountControllerIT {
     void findAllAccounts()  throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         entityManager.clear();
-        mockMvc.perform(get("/api/account"))
+        mockMvc.perform(get("/api/account").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(account.getId()))
@@ -90,7 +93,7 @@ public class AccountControllerIT {
     void findAccountById() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         entityManager.clear();
-        mockMvc.perform(get("/api/account/{id}", account.getId()))
+        mockMvc.perform(get("/api/account/{id}", account.getId()).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(account.getId()))
                 .andExpect(jsonPath("$.personId").value(person.getId()))
@@ -105,8 +108,7 @@ public class AccountControllerIT {
         account.setBalance(new BigDecimal("125.50"));
         accountRepository.saveAndFlush(account);
         entityManager.clear();
-        mockMvc.perform(get("/api/account/{id}/balance", account.getId()))
-                .andExpect(status().isOk())
+        mockMvc.perform(get("/api/account/{id}/balance", account.getId()).with(jwt()))
                 .andExpect(jsonPath("$.accountId").value(account.getId()))
                 .andExpect(jsonPath("$.balance").value(125.50))
                 .andExpect(jsonPath("$.currency").value("€ (EUR)"));
@@ -118,7 +120,7 @@ public class AccountControllerIT {
         Long id = account.getId();
         long counterBefore = accountRepository.count();
         entityManager.clear();
-        mockMvc.perform(put("/api/account/{id}", id)
+        mockMvc.perform(put("/api/account/{id}", id).with(jwt())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                                 {
@@ -146,7 +148,7 @@ public class AccountControllerIT {
         Long id = account.getId();
         long counterBefore = accountRepository.count();
         entityManager.clear();
-        mockMvc.perform(delete("/api/account/{id}", id))
+        mockMvc.perform(delete("/api/account/{id}", id).with(jwt()))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
         entityManager.flush();

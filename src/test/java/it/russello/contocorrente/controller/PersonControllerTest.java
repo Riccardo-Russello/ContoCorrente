@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 @WebMvcTest(PersonController.class)
+@AutoConfigureMockMvc(addFilters = false)
 public class PersonControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -35,14 +37,26 @@ public class PersonControllerTest {
             {
                 "firstName" : "Mario",
                 "lastName" : "Rossi",
-                "dateOfBirth" : "1990-05-15"
+                "dateOfBirth" : "1990-05-15",
+                "username" : "mario.rossi",
+                "password" : "passwmario"
             }
             """;
     private static PersonRequest request(){
-        return new PersonRequest("Mario", "Rossi", BIRTH_DATE);
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
     }
     private static PersonResponse response(){
         return new PersonResponse(1L, "Mario", "Rossi", BIRTH_DATE);
+    }
+    private static final String UPDATE_JSON = """
+        {
+            "firstName": "Mario",
+            "lastName": "Rossi",
+            "dateOfBirth": "1990-05-15"
+        }
+        """;
+    private static PersonRequest updateRequest() {
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, null, null);
     }
 
     @Test
@@ -106,32 +120,32 @@ public class PersonControllerTest {
 
     @Test
     void updatePerson() throws Exception {
-        when(personService.update(1L, request())).thenReturn(response());
+        when(personService.update(1L, updateRequest())).thenReturn(response());
         mockMvc.perform(put("/api/person/1")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(VALID_JSON)).andExpect(status().isOk())
+                    .content(UPDATE_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
                 .andExpect(jsonPath("$.lastName").value("Rossi"))
                 .andExpect(jsonPath("$.dateOfBirth").value("1990-05-15"));
-        verify(personService).update(1L, request());
+        verify(personService).update(1L, updateRequest());
     }
 
     @Test
     void updatePersonNotFound() throws Exception {
-        when(personService.update(1L, request())).thenThrow(new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Person non trovata"));
+        when(personService.update(1L, updateRequest())).thenThrow(new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Person non trovata"));
         mockMvc.perform(put("/api/person/1")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(VALID_JSON))
+                    .content(UPDATE_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
-        verify(personService).update(1L, request());
+        verify(personService).update(1L, updateRequest());
     }
 
     @Test
     void createBadRequestInvalidData() throws Exception {
-        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE);
+        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE, null, null);
         when(personService.create(invalid)).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA", "Nome obbligatorio"));
         mockMvc.perform(post("/api/person")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -150,7 +164,7 @@ public class PersonControllerTest {
 
     @Test
     void updateBadRequestInvalidData() throws Exception {
-        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE);
+        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE, null, null);
         when(personService.update(1L, invalid)).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA", "Nome obbligatorio"));
         mockMvc.perform(put("/api/person/1")
                         .contentType(MediaType.APPLICATION_JSON)
