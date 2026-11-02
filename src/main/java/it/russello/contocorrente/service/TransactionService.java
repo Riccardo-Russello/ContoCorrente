@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.parameters.P;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -30,15 +31,12 @@ public class TransactionService {
     private static final BigDecimal MAX_MONEY = new BigDecimal("9999999999999.99");
 
     @Transactional
-    public AccountTransactionResponse createTransaction(Long accountId, AccountTransactionRequest request) {     // createAccountTransaction (spostare nel service separato)
-        if (request == null) {
-            throw invalidTransaction("Corpo della richiesta è obbligatorio");
-        }
+    @PreAuthorize("""
+            hasRole('admin') or (hasRole('user') and @accountSecurity.isOwner(#accountId, authentication))
+            """)
+    public AccountTransactionResponse createTransaction(@P("accountId")Long accountId, AccountTransactionRequest request) {     // createAccountTransaction (spostare nel service separato)
         if(accountId == null || accountId <= 0){
             throw invalidTransaction("Id del conto deve essere positivo");
-        }
-        if (request.type() == null) {
-            throw invalidTransaction("Tipo obbligatorio: DEPOSIT, WITHDRAWAL o TRANSFER");
         }
         if(request.type() == TransactionType.TRANSFER) {
             TransferResponse response = transfer(accountId, new TransferRequest(request.to(), request.amount()));
@@ -51,11 +49,7 @@ public class TransactionService {
                     response.destinationAccountId(),
                     response.destinationBalance());
         }
-        if(request.to() != null){
-            throw invalidTransaction("Destinatario ammesso solo per TRANFER");
-        }
-
-        BigDecimal amount = validateAmount(request.amount());
+        BigDecimal amount = request.amount().setScale(2);
         Account account = requireAccount(accountId);
         BigDecimal newBalance;
 
@@ -83,18 +77,18 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransferResponse transfer(Long sourceAccountId, TransferRequest request) {
-        if(request == null){
-            throw invalidTransaction("Corpo della richiesta obbligatorio");
-        }
+    @PreAuthorize("""
+            hasRole('admin') or (hasRole('user') and @accountSecurity.isOwner(#sourceAccountId, authentication))
+            """)
+    public TransferResponse transfer(@P("sourceAccountId")Long sourceAccountId, TransferRequest request) {
         Long destinationAccountId = request.destinationAccountId();
-        if(sourceAccountId == null || sourceAccountId <= 0 || destinationAccountId == null || destinationAccountId <= 0){
+        if(sourceAccountId == null || sourceAccountId <= 0){
             throw invalidTransaction("Id dei conti devono essere positivi");
         }
         if(sourceAccountId.equals(destinationAccountId)){
             throw invalidTransaction("Id dei conti sorgente e destinazione devono essere diversi");
         }
-        BigDecimal amount = validateAmount(request.amount());
+        BigDecimal amount = request.amount().setScale(2);
         Account source = requireAccount(sourceAccountId);
         Account destination = requireAccount(destinationAccountId);
 
@@ -115,7 +109,10 @@ public class TransactionService {
         return TransferResponse.from(savedTransaction, sourceBalance, destinationBalance);
     }
 
-    public List<TransactionListResponse> getLastFiveTransactions(Long accountId) {
+    @PreAuthorize("""
+            hasRole('admin') or (hasRole('user') and @accountSecurity.isOwner(#accountId, authentication))
+            """)
+    public List<TransactionListResponse> getLastFiveTransactions(@P("accountId")Long accountId) {
         requireAccount(accountId);
         return accountTransactionRepository
                 .findTop5ByAccount_IdOrDestinationAccount_IdOrderByOccurredAtDescIdDesc(accountId, accountId)
@@ -132,23 +129,6 @@ public class TransactionService {
                         "Conto non trovato"
                 ));
     }
-
-    private BigDecimal validateAmount(BigDecimal amount) {
-        if (amount == null) {
-            throw invalidTransaction("Importo obbligatorio");
-        }
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw invalidTransaction("Importo deve essere maggiore di zero");
-        }
-        if (amount.scale() > 2) {
-            throw invalidTransaction("Importo deve avere massimo due cifre decimali");
-        }
-        if (amount.compareTo(MAX_MONEY) > 0) {
-            throw invalidTransaction("Limite di importo superato");
-        }
-        return amount.setScale(2);
-    }
-
     private ApiException invalidTransaction(String message) {
         return new ApiException(HttpStatus.BAD_REQUEST,
                 "INVALID_TRANSACTION_DATA", message);

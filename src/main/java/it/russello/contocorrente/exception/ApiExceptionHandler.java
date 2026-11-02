@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
+import it.russello.contocorrente.dto.*;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 @ControllerAdvice
 public class ApiExceptionHandler {
@@ -64,5 +66,29 @@ public class ApiExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataConflict(DataIntegrityViolationException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("DATA_CONFLICT", "Operazione incompatibile con i vncoli del database"));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException exception) {
+        Object target = exception.getBindingResult().getTarget();
+        String code = switch (target) {
+            case PersonRequest ignored -> "INVALID_PERSON_DATA";
+            case AccountCreateRequest ignored -> "INVALID_ACCOUNT_DATA";
+            case AccountUpdateRequest ignored -> "INVALID_ACCOUNT_DATA";
+            case LoginRequest ignored -> "INVALID_LOGIN_DATA";
+            case AccountTransactionRequest ignored -> "INVALID_TRANSACTION_DATA";
+            case TransferRequest ignored -> "INVALID_TRANSACTION_DATA";
+            case null, default -> "INVALID_REQUEST";
+        };
+        String message = exception.getBindingResult()
+                .getAllErrors()
+                .stream()
+                .map(error -> error.getDefaultMessage())
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .sorted()
+                .collect(java.util.stream.Collectors.joining("; "));
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse(code, message));
     }
 }

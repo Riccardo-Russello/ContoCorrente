@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -25,7 +25,7 @@ public class AccountController {
     @Operation(summary = "Crea un conto corrente")
     @PostMapping
     public ResponseEntity<AccountResponse> create(
-            @RequestBody AccountCreateRequest request) {
+             @Valid @RequestBody AccountCreateRequest request) {
         AccountResponse response = accountService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(response);
@@ -54,7 +54,7 @@ public class AccountController {
     @PutMapping("/{id}")
     public ResponseEntity<AccountResponse> update(
             @PathVariable("id") Long id,
-            @RequestBody AccountUpdateRequest request) {
+            @Valid @RequestBody AccountUpdateRequest request) {
         return ResponseEntity.status(HttpStatus.OK).body(accountService.update(id, request));
     }
 

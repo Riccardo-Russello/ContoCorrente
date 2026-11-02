@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,7 +23,7 @@ public class TransactionController {
     @PostMapping
     public ResponseEntity<AccountTransactionResponse> createTransaction(
             @PathVariable("id") Long accountId,
-            @RequestBody AccountTransactionRequest request) {
+            @Valid @RequestBody AccountTransactionRequest request) {
         AccountTransactionResponse response = transactionService.createTransaction(accountId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -31,7 +32,7 @@ public class TransactionController {
     @PostMapping("/transfer")
     public ResponseEntity<TransferResponse> transfer(
             @PathVariable("id") Long sourceAccountId,
-            @RequestBody TransferRequest request){
+            @Valid @RequestBody TransferRequest request){
         TransferResponse response = transactionService.transfer(sourceAccountId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

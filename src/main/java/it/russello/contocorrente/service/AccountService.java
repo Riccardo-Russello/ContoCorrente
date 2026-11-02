@@ -14,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.parameters.P;
+import it.russello.contocorrente.security.AccountSecurity;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,17 +28,16 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final PersonRepository personRepository;
     private final AccountTransactionRepository accountTransactionRepository;
+    private final AccountSecurity accountSecurity;
 
-
+    @PreAuthorize("hasAnyRole('admin', 'user')")
     public AccountResponse create(AccountCreateRequest request) {
-        if (request == null) {
-            throw invalidAccount("Corpo della richiesta obbligatorio");
+        Long currentPersonId = accountSecurity.currentPersonId();
+        Long ownerPersonId = request.personId() == null ? currentPersonId : request.personId();
+        if(!accountSecurity.isAdmin() && !currentPersonId.equals(ownerPersonId)){
+            throw new AccessDeniedException("Puoi creare un conto soltanto per te stesso");
         }
-        if (request.personId() == null) {
-            throw invalidAccount("Id persona obbligatorio");
-        }
-        validateAccountNumber(request.accountNumber());
-        Person person = personRepository.findById(request.personId())
+        Person person = personRepository.findById(ownerPersonId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
                         "PERSON_NOT_FOUND",
                         "Persona non trovata"));
@@ -48,18 +50,32 @@ public class AccountService {
         return AccountResponse.from(savedAccount);
     }
 
+    @PreAuthorize("hasAnyRole('admin', 'user')")
     public List<AccountResponse> findAll() {
-        return accountRepository.findAll()
-                .stream()
+        List<Account> accounts;
+        if(accountSecurity.isAdmin()){
+            accounts = accountRepository.findAll();
+        }else{
+            Long personId = accountSecurity.currentPersonId();
+            accounts = accountRepository.findByPerson_Id(personId);
+        }
+        return accounts.stream()
                 .map(AccountResponse::from)
                 .toList();
     }
 
+    @PreAuthorize("""
+            hasRole('admin') or
+            (hasRole('user') and @accountSecurity.isOwner(#id, authentication))
+            """)
     public AccountResponse findById(Long id) {
         return AccountResponse.from(requireAccount(id));
     }
 
-    public AccountBalanceResponse getBalance(Long id){
+    @PreAuthorize("""
+            hasRole('admin') or (hasRole('user') and @accountSecurity.isOwner(#id, authentication))
+            """)
+    public AccountBalanceResponse getBalance(@P("id")Long id){
         Account account = requireAccount(id);
         return AccountBalanceResponse.from(account);
     }
@@ -67,10 +83,6 @@ public class AccountService {
 
     public AccountResponse update(Long id, AccountUpdateRequest request) {
         Account account = requireAccount(id);
-        if (request == null) {
-            throw invalidAccount("Corpo della richiesta obbligatorio");
-        }
-        validateAccountNumber(request.accountNumber());
         if (accountRepository.existsByAccountNumberAndIdNot(
                 request.accountNumber(), id)) {
             throw duplicateAccountNumber();
@@ -106,21 +118,6 @@ public class AccountService {
                         "Conto non trovato"
                 ));
     }
-
-    private void validateAccountNumber(String accountNumber) {
-        if (accountNumber == null || accountNumber.isBlank()) {
-            throw invalidAccount("numero di account è obbligatorio, non può avere solo spazi");
-        }
-        if (accountNumber.length() > 30) {
-            throw invalidAccount("Numero di account non superiore a 30 caratteri");
-        }
-    }
-
-    private ApiException invalidAccount(String message) {
-        return new ApiException(HttpStatus.BAD_REQUEST,
-                "INVALID_ACCOUNT_DATA", message);
-    }
-
     private ApiException duplicateAccountNumber() {
         return new ApiException(HttpStatus.CONFLICT,
                 "ACCOUNT_NUMBER_ALREADY_EXISTS",

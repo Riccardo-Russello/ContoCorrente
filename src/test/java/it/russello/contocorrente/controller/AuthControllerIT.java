@@ -21,7 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.Instant;
 import java.time.LocalDate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -41,7 +41,7 @@ public class AuthControllerIT {
     private void savePerson(){
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
-        person.setPassword(passwordEncoder.encode(("passwmario"));
+        person.setPassword(passwordEncoder.encode("passwmario"));
         personRepository.saveAndFlush(person);
     }
     private String loginAndGetToken() throws Exception{
@@ -62,7 +62,7 @@ public class AuthControllerIT {
     }
 
     @Test
-    void registrationPublicAndStoresPlainPassword() throws Exception{
+    void registrationPublicAndStoresCryptedPassword() throws Exception{
         mockMvc.perform(post("/api/person")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -78,7 +78,7 @@ public class AuthControllerIT {
                 .andExpect(jsonPath("$.password").doesNotExist());
         Person saved = personRepository.findByUsername("jwt.registration.user")
                 .orElseThrow();
-        assertEquals("passwanna", saved.getPassword());
+        assertTrue(passwordEncoder.matches("passwanna", saved.getPassword()));
     }
 
     @Test
