@@ -11,6 +11,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static it.russello.contocorrente.support.TestJwt.admin;
+import it.russello.contocorrente.entity.Account;
+import it.russello.contocorrente.repository.AccountRepository;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 
 import java.time.LocalDate;
 
@@ -28,6 +34,10 @@ public class PersonControllerIT {
     private PersonRepository personRepository;
     @Autowired
     private EntityManager entityManager;
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    @Autowired
+    private AccountRepository accountRepository;
 
     @Test
     void createPerson() throws Exception {
@@ -60,7 +70,9 @@ public class PersonControllerIT {
         assertEquals(saved.getLastName(), "Rossi");
         assertEquals(saved.getDateOfBirth(), LocalDate.of(1990, 5, 15));
         assertEquals("mario.rossi", saved.getUsername());
-        assertEquals("passwmario", saved.getPassword());
+        assertNotEquals("passwmario", saved.getPassword());
+        assertTrue(passwordEncoder.matches("passwmario", saved.getPassword()));
+        assertEquals(it.russello.contocorrente.entity.Role.user, saved.getRole());
     }
 
     @Test
@@ -70,7 +82,7 @@ public class PersonControllerIT {
         person.setPassword("passwmario");
         person = personRepository.saveAndFlush(person);
         Long id = person.getId();
-        mockMvc.perform(get("/api/person").with(jwt()))
+        mockMvc.perform(get("/api/person").with(admin(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(id))
@@ -88,7 +100,7 @@ public class PersonControllerIT {
         Long id = person.getId();
         entityManager.clear();
 
-        mockMvc.perform(get("/api/person/{id}", id).with(jwt()))
+        mockMvc.perform(get("/api/person/{id}", id).with(admin(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
@@ -106,7 +118,7 @@ public class PersonControllerIT {
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        mockMvc.perform(put("/api/person/{id}", id).with(jwt())
+        mockMvc.perform(put("/api/person/{id}", id).with(admin(1L))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {
@@ -133,6 +145,34 @@ public class PersonControllerIT {
     }
 
     @Test
+    void updateRejectsCredentialsAndLeavesPersonUnchanged() throws Exception {
+        Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("update.credentials");
+        person.setPassword("original-password");
+        personRepository.saveAndFlush(person);
+        Long id = person.getId();
+        mockMvc.perform(put("/api/person/{id}", id)
+                        .with(admin(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "firstName":"Anna",
+                              "lastName":"Verdi",
+                              "dateOfBirth":"1995-02-10",
+                              "username":"changed.username",
+                              "password":"Password123!"
+                            }
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PERSON_DATA"));
+        entityManager.clear();
+        Person unchanged = personRepository.findById(id).orElseThrow();
+        assertEquals("Mario", unchanged.getFirstName());
+        assertEquals("update.credentials", unchanged.getUsername());
+        assertEquals("original-password", unchanged.getPassword());
+    }
+
+    @Test
     void deletePerson() throws Exception{
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
@@ -142,7 +182,7 @@ public class PersonControllerIT {
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        mockMvc.perform(delete("/api/person/{id}", id).with(jwt()))
+        mockMvc.perform(delete("/api/person/{id}", id).with(admin(1L)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
         entityManager.flush();
@@ -150,5 +190,45 @@ public class PersonControllerIT {
 
         assertFalse(personRepository.existsById(id));
         assertEquals(counterBefore -1 , personRepository.count());
+    }
+
+    @ValueSource(strings = {"GET", "PUT", "DELETE"})
+    void missingPersonReturnsNotFound(String method) throws Exception {
+        var request = switch (method) {
+            case "GET" -> get("/api/person/{id}", Long.MAX_VALUE);
+            case "PUT" -> put("/api/person/{id}", Long.MAX_VALUE)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "firstName":"Anna",
+                          "lastName":"Verdi",
+                          "dateOfBirth":"1995-02-10"
+                        }
+                        """);
+            case "DELETE" -> delete("/api/person/{id}", Long.MAX_VALUE);
+            default -> throw new IllegalArgumentException(method);
+        };
+        long before = personRepository.count();
+        mockMvc.perform(request.with(admin(1L)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
+        assertEquals(before, personRepository.count());
+    }
+
+    @Test
+    void personWithAccountCannotBeDeleted() throws Exception {
+        Person person = new Person(
+                "Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("delete.person");
+        person.setPassword("fixture-password");
+        personRepository.saveAndFlush(person);
+        Account account = accountRepository.saveAndFlush(new Account(person, "PERSON-DELETE"));
+        mockMvc.perform(delete("/api/person/{id}", person.getId())
+                        .with(admin(person.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PERSON_HAS_ACCOUNT"));
+        entityManager.clear();
+        assertTrue(personRepository.existsById(person.getId()));
+        assertTrue(accountRepository.existsById(account.getId()));
     }
 }

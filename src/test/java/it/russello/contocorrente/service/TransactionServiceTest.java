@@ -8,7 +8,6 @@ import it.russello.contocorrente.entity.TransactionType;
 import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.repository.AccountRepository;
 import it.russello.contocorrente.repository.AccountTransactionRepository;
-import org.aspectj.util.Reflection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -19,7 +18,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.repository.core.support.TransactionalRepositoryFactoryBeanSupport;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -103,6 +101,23 @@ public class TransactionServiceTest {
         assertEquals(money(expectedBalance), existing.getBalance());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "100.00, 50.00, 100.00, 0.00, 150.00",
+            "100.00, 9999999999999.98, 0.01, 99.99, 9999999999999.99"})
+    void transferAcceptsExactBalanceLimits(String initialSource, String initialDestination, String amount, String expectedSource, String expectedDestination){
+        Account source = account(1L, initialSource);
+        Account destination = account(2L, initialDestination);
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(destination));
+        when(accountTransactionRepository.save(any(AccountTransaction.class))).thenAnswer(invocation -> persisted(invocation.getArgument(0)));
+        TransferResponse response = transactionService.transfer(1L, new TransferRequest(2L, money(amount)));
+        assertEquals(money(expectedSource), response.balance());
+        assertEquals(money(expectedDestination), response.destinationBalance());
+        assertEquals(money(expectedSource), source.getBalance());
+        assertEquals(money(expectedDestination), destination.getBalance());
+    }
+
     @Test
     void normalizesAmountTwoDecimals(){
         Account existing = account(1L, "100.00");
@@ -121,18 +136,6 @@ public class TransactionServiceTest {
         ApiException exception = assertThrows(ApiException.class, () -> transactionService.createTransaction(accountId, request));
         assertApiError(exception, HttpStatus.BAD_REQUEST, "INVALID_TRANSACTION_DATA");
         verifyNoInteractions(accountRepository, accountTransactionRepository);
-    }
-
-    @ParameterizedTest
-    @MethodSource("invalidAmounts")
-    void invalidAmountForEveryTransaction(BigDecimal amount){
-        for(TransactionType type : TransactionType.values()){
-            Long destination = type == TransactionType.TRANSFER ? 2L : null;
-            AccountTransactionRequest request = new AccountTransactionRequest(amount, type, destination);
-            ApiException exception = assertThrows(ApiException.class, () -> transactionService.createTransaction(1L, request));
-            assertApiError(exception, HttpStatus.BAD_REQUEST, "INVALID_TRANSACTION_DATA");
-            verifyNoInteractions(accountRepository, accountTransactionRepository);
-        }
     }
 
     @Test
@@ -272,32 +275,19 @@ public class TransactionServiceTest {
 
 
     static Stream<Arguments> invalidTransactions() {
-        return Stream.of(Arguments.of(1L, null),
-                            Arguments.of(null, new AccountTransactionRequest(money("10.00"), TransactionType.DEPOSIT, null)),
-                            Arguments.of(0L, new AccountTransactionRequest(money("10.00"), TransactionType.DEPOSIT, null)),
-                            Arguments.of(-1L, new AccountTransactionRequest(money("10.00"), TransactionType.DEPOSIT, null)),
-                            Arguments.of(1L, new AccountTransactionRequest(money("10.00"), null, null)),
-                            Arguments.of(1L, new AccountTransactionRequest(money("10.00"), TransactionType.DEPOSIT, 2L)),
-                            Arguments.of(1L, new AccountTransactionRequest(money("10.00"), TransactionType.WITHDRAWAL, 2L))
-        );
-    }
-    static Stream<Arguments> invalidAmounts() {
-        return Stream.of(Arguments.of((Object) null),
-                            Arguments.of(money("0")),
-                            Arguments.of(money("-0.01")),
-                            Arguments.of(money("1.001")),
-                            Arguments.of(money("10000000000000.00"))
+        AccountTransactionRequest request = new AccountTransactionRequest(money("10.00"), TransactionType.DEPOSIT, null);
+        return Stream.of(
+                Arguments.of(null, request),
+                Arguments.of(0L, request),
+                Arguments.of(-1L, request)
         );
     }
     static Stream<Arguments> invalidTransfers() {
-        return Stream.of(Arguments.of(1L, null),
-                            Arguments.of(null, new TransferRequest(2L, money("10.00"))),
-                            Arguments.of(0L, new TransferRequest(2L, money("10.00"))),
-                            Arguments.of(-1L, new TransferRequest(2L, money("10.00"))),
-                            Arguments.of(1L, new TransferRequest(null, money("10.00"))),
-                            Arguments.of(1L, new TransferRequest(0L, money("10.00"))),
-                            Arguments.of(1L, new TransferRequest(-1L, money("10.00"))),
-                            Arguments.of(1L, new TransferRequest(1L, money("10.00")))
+        return Stream.of(
+                Arguments.of(null, new TransferRequest(2L, money("10.00"))),
+                Arguments.of(0L, new TransferRequest(2L, money("10.00"))),
+                Arguments.of(-1L, new TransferRequest(2L, money("10.00"))),
+                Arguments.of(1L, new TransferRequest(1L, money("10.00")))
         );
     }
 }

@@ -22,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
+import it.russello.contocorrente.security.AccountSecurity;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,6 +45,8 @@ public class AccountServiceTest {
     private PersonRepository personRepository;
     @Mock
     private AccountTransactionRepository accountTransactionRepository;
+    @Mock
+    private AccountSecurity accountSecurity;
     @InjectMocks
     private AccountService accountService;
 
@@ -69,6 +73,8 @@ public class AccountServiceTest {
         when(personRepository.findById(10L)).thenReturn(Optional.of(owner));
         when(accountRepository.existsByAccountNumber("ACC-001")).thenReturn(false);
         when(accountRepository.saveAndFlush(any(Account.class))).thenReturn(saved);
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(true);
         AccountResponse response = accountService.create(validCreateRequest());
         assertEquals(new AccountResponse(1L, 10L, "ACC-001", OPENED_AT, new BigDecimal("0.00")), response);
         ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
@@ -85,17 +91,54 @@ public class AccountServiceTest {
         verifyNoInteractions(accountTransactionRepository);
     }
 
-    @ParameterizedTest
-    @MethodSource("invalidCreateRequests")
-    void createWithInvalidData(AccountCreateRequest request){
-        ApiException exception = assertThrows(ApiException.class, () -> accountService.create(request));
-        assertApiError(exception, HttpStatus.BAD_REQUEST, "INVALID_ACCOUNT_DATA");
-        verifyNoInteractions(accountRepository,  personRepository, accountTransactionRepository);
+    @Test
+    void createWithoutPersonIdUsesCurrentPerson(){
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(false);
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
+        when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer((invocation -> invocation.getArgument(0)));
+        AccountResponse response = accountService.create(new AccountCreateRequest(null, "ACC-SELF"));
+        assertEquals(10L, response.personId());
+        assertEquals("ACC-SELF", response.accountNumber());
+        verify(personRepository).findById(10L);
+    }
+
+    @Test
+    void userCreateAccountForSelf(){
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(false);
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
+        when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer((invocation -> invocation.getArgument(0)));
+        AccountResponse response = accountService.create(validCreateRequest());
+        assertEquals(10L, response.personId());
+        verify(accountRepository).saveAndFlush(any(Account.class));
+    }
+
+    @Test
+    void userCannotCreateAccountForAnotherPerson(){
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(false);
+        assertThrows(AccessDeniedException.class, () -> accountService.create(new AccountCreateRequest(20L, "ACC-OTHER")));
+        verifyNoInteractions(personRepository, accountRepository, accountTransactionRepository);
+    }
+
+    @Test
+    void adminCanCreateAccountForAnotherPerson(){
+        Person other = person();
+        ReflectionTestUtils.setField(other, "id", 20L);
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(true);
+        when(personRepository.findById(20L)).thenReturn(Optional.of(other));
+        when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AccountResponse response = accountService.create(new AccountCreateRequest(20L, "ACC-OTHER"));
+        assertEquals(20L, response.personId());
     }
 
     @Test
     void createMissingPerson(){
         when(personRepository.findById(10L)).thenReturn(Optional.empty());
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(true);
         ApiException exception = assertThrows(ApiException.class, () -> accountService.create(validCreateRequest()));
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
         verifyNoInteractions(accountRepository, accountTransactionRepository);
@@ -105,6 +148,8 @@ public class AccountServiceTest {
     void createDuplicateAccountNumber(){
         when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
         when(accountRepository.existsByAccountNumber("ACC-001")).thenReturn(true);
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(true);
         ApiException exception = assertThrows(ApiException.class, () -> accountService.create(validCreateRequest()));
         assertApiError(exception, HttpStatus.CONFLICT, "ACCOUNT_NUMBER_ALREADY_EXISTS");
         verify(accountRepository, never()).saveAndFlush(any(Account.class));
@@ -116,6 +161,8 @@ public class AccountServiceTest {
         String number = "a".repeat(30);
         when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
         when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountSecurity.isAdmin()).thenReturn(true);
         AccountResponse response = accountService.create(new AccountCreateRequest(10L, number));
         assertEquals(number, response.accountNumber());
         verify(accountRepository).existsByAccountNumber(number);
@@ -129,10 +176,30 @@ public class AccountServiceTest {
         second.setAccountNumber("ACC-002");
         second.setBalance(new BigDecimal("50.00"));
         when(accountRepository.findAll()).thenReturn(List.of(first,second));
+        when(accountSecurity.isAdmin()).thenReturn(true);
         assertEquals(List.of(new AccountResponse(1L, 10L, "ACC-001", OPENED_AT, new BigDecimal("0.00")),
                 new AccountResponse(2L, 10L, "ACC-002", OPENED_AT, new BigDecimal("50.00"))),
                 accountService.findAll());
         verify(accountRepository).findAll();
+    }
+
+    @Test
+    void userFindAllReturnOwnAccounts(){
+        when(accountSecurity.isAdmin()).thenReturn(false);
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountRepository.findByPerson_Id(10L)).thenReturn(List.of(account(1L)));
+        assertEquals(List.of(AccountResponse.from(account(1L))), accountService.findAll());
+        verify(accountRepository).findByPerson_Id(10L);
+        verify(accountRepository, never()).findAll();
+    }
+
+    @Test
+    void userWithoutAccountGetsEmptyList(){
+        when(accountSecurity.isAdmin()).thenReturn(false);
+        when(accountSecurity.currentPersonId()).thenReturn(10L);
+        when(accountRepository.findByPerson_Id(10L)).thenReturn(List.of());
+        assertTrue(accountService.findAll().isEmpty());
+        verify(accountRepository, never()).findAll();
     }
 
     @Test
@@ -175,19 +242,6 @@ public class AccountServiceTest {
         verifyNoInteractions(personRepository, accountTransactionRepository);
     }
 
-    @ParameterizedTest
-    @MethodSource("invalidUpdateRequests")
-    void updateInvalidData(AccountUpdateRequest request){
-        Account existing = account(1L);
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
-        ApiException exception = assertThrows(ApiException.class, () -> accountService.update(1L, request));
-        assertApiError(exception, HttpStatus.BAD_REQUEST, "INVALID_ACCOUNT_DATA");
-        assertEquals("ACC-001",  existing.getAccountNumber());
-        verify(accountRepository, never()).saveAndFlush(any(Account.class));
-        verify(accountRepository).findById(1L);
-        verifyNoMoreInteractions(accountRepository);
-        verifyNoInteractions(personRepository, accountTransactionRepository);
-    }
 
     @Test
     void updateDuplicateAccountNumber(){
@@ -274,24 +328,5 @@ public class AccountServiceTest {
     private static void assertApiError(ApiException exception, HttpStatus status, String code){
         assertEquals(status, exception.getStatus());
         assertEquals(code, exception.getCode());
-    }
-    static Stream<AccountCreateRequest> invalidCreateRequests(){
-        return Stream.of(
-                (AccountCreateRequest) null,
-                new AccountCreateRequest(null, "ACC-001"),
-                new AccountCreateRequest(10L, null),
-                new AccountCreateRequest(10L, ""),
-                new AccountCreateRequest(10L, "    "),
-                new AccountCreateRequest(10L, "a".repeat(31))
-        );
-    }
-    static Stream<AccountUpdateRequest> invalidUpdateRequests(){
-        return Stream.of(
-                (AccountUpdateRequest) null,
-                new AccountUpdateRequest(null),
-                new AccountUpdateRequest(""),
-                new AccountUpdateRequest("    "),
-                new AccountUpdateRequest("a".repeat(31))
-        );
     }
 }

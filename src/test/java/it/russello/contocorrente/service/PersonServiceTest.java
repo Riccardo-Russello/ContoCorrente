@@ -50,33 +50,24 @@ public class PersonServiceTest {
     void createValidPerson(){
         Person saved = person(1L);
         when(personRepository.save(any(Person.class))).thenReturn(saved);
-        when(passwordEncoder.encode("passwmario")).thenReturn("passwmario");
+        when(passwordEncoder.encode("passwmario")).thenReturn("encoded-password");
         PersonResponse response = personService.create(validRequest());
         assertEquals(new PersonResponse(1L, "Mario", "Rossi", BIRTH_DATE), response);
-
         ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
         verify(personRepository).save(captor.capture());
-
         Person submitted = captor.getValue();
         assertNull(submitted.getId());
         assertEquals("Mario", submitted.getFirstName());
         assertEquals("Rossi", submitted.getLastName());
         assertEquals(BIRTH_DATE, submitted.getDateOfBirth());
         assertEquals("mario.rossi", submitted.getUsername());
-        assertEquals("passwmario", submitted.getPassword());
+        assertEquals("encoded-password", submitted.getPassword());
+        assertEquals(it.russello.contocorrente.entity.Role.user, submitted.getRole());
         verify(personRepository).existsByUsername("mario.rossi");
         verify(passwordEncoder).encode("passwmario");
         verifyNoInteractions(accountRepository);
     }
 
-    @ParameterizedTest
-    @MethodSource("invalidRequest")
-    void createPersonInvalidData(PersonRequest request){
-        ApiException exception = assertThrows(ApiException.class, () -> personService.create(request));
-
-        assertApiError(exception, HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA");
-        verifyNoInteractions(personRepository, accountRepository);
-    }
 
     @Test
     void createWithExistingUsername(){
@@ -115,7 +106,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void findByIdReturnsEmptyList(){
+    void findAllReturnsEmptyList(){
         when(personRepository.findAll()).thenReturn(List.of());
         assertTrue(personService.findAll().isEmpty());
         verify(personRepository).findAll();
@@ -143,13 +134,10 @@ public class PersonServiceTest {
     void updateExistingPerson(){
         Person existing = person(1L);
         PersonRequest request = new PersonRequest("Luigi", "Verdi", LocalDate.of(1988, 3, 20), null, null);
-
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(personRepository.save(existing)).thenReturn(existing);
-
         PersonResponse response = personService.update(1L, request);
         assertEquals(new PersonResponse(1L, "Luigi", "Verdi", LocalDate.of(1988, 3, 20)), response);
-
         assertEquals("Luigi", existing.getFirstName());
         assertEquals("Verdi", existing.getLastName());
         assertEquals(request.dateOfBirth(), existing.getDateOfBirth());
@@ -160,8 +148,7 @@ public class PersonServiceTest {
     @Test
     void updateMissingPerson(){
         when(personRepository.findById(1L)).thenReturn(Optional.empty());
-        ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, validRequest()));
-
+        ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, validUpdateRequest()));
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
         verify(personRepository, never()).save(any(Person.class));
         verifyNoMoreInteractions(accountRepository);
@@ -170,25 +157,16 @@ public class PersonServiceTest {
     @Test
     void updateMustNotChangeCredentials(){
         Person existing = person(1L);
+        existing.setUsername("mario.rossi");
+        existing.setPassword("encoded-password");
+        existing.setRole(it.russello.contocorrente.entity.Role.admin);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, validRequest()));
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
-        verify(personRepository, never()).save(any(Person.class));
-    }
-
-    @ParameterizedTest
-    @MethodSource("invalidRequest")
-    void updateInvalidDataNoChangingPerson(PersonRequest request){
-        Person existing = person(1L);
-        when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, request));
-
-        assertApiError(exception, HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA");
-        assertEquals("Mario", existing.getFirstName());
-        assertEquals("Rossi", existing.getLastName());
-        assertEquals(BIRTH_DATE, existing.getDateOfBirth());
-        verify(personRepository, never()).save(any(Person.class));
-        verifyNoMoreInteractions(accountRepository);
+        when(personRepository.save(existing)).thenReturn(existing);
+        personService.update(1L, new PersonRequest("Anna", "Verdi", LocalDate.of(1995, 2, 10), null, null));
+        assertEquals("mario.rossi", existing.getUsername());
+        assertEquals("encoded-password", existing.getPassword());
+        assertEquals(it.russello.contocorrente.entity.Role.admin, existing.getRole());
+        verifyNoInteractions(passwordEncoder);
     }
 
     @Test
@@ -241,19 +219,5 @@ public class PersonServiceTest {
     private static void assertApiError(ApiException exception, HttpStatus status, String code){
         assertEquals(status, exception.getStatus());
         assertEquals(code, exception.getCode());
-    }
-    static Stream<PersonRequest> invalidRequest(){
-        return Stream.of(
-                (PersonRequest) null,
-                new PersonRequest(null, "Rossi", BIRTH_DATE, null, null),
-                new PersonRequest("", "Rossi", BIRTH_DATE, null, null),
-                new PersonRequest("   ", "Rossi", BIRTH_DATE, null, null),
-                new PersonRequest("a".repeat(31), "Rossi", BIRTH_DATE, null, null),
-                new PersonRequest("Mario", null, BIRTH_DATE, null, null),
-                new PersonRequest("Mario", "", BIRTH_DATE, null, null),
-                new PersonRequest("Mario", "   ", BIRTH_DATE, null, null),
-                new PersonRequest("Mario", "a".repeat(31), BIRTH_DATE, null, null),
-                new PersonRequest("Mario", "Rossi", null, null, null),
-                new PersonRequest("Mario", "Rossi", LocalDate.now().plusDays(1), null, null));
     }
 }

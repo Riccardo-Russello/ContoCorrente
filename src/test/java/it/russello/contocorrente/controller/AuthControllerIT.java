@@ -37,6 +37,8 @@ public class AuthControllerIT {
     private JwtEncoder jwtEncoder;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     private void savePerson(){
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
@@ -90,6 +92,27 @@ public class AuthControllerIT {
     }
 
     @Test
+    void loginTokenContainsExpectedIdentityAndAuthorities() throws Exception {
+        savePerson();
+        String token = loginAndGetToken();
+        var decoded = jwtDecoder.decode(token);
+        Person person = personRepository.findByUsername("mario.rossi").orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "mario.rossi", decoded.getSubject());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                person.getId().toString(), decoded.getClaimAsString("personId"));
+        var authorities = decoded.getClaimAsStringList("authorities");
+        org.junit.jupiter.api.Assertions.assertNotNull(authorities);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                java.util.Set.of("ROLE_user", "FACTOR_PASSWORD"),
+                new java.util.HashSet<>(authorities));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                3600,
+                java.time.Duration.between(
+                        decoded.getIssuedAt(), decoded.getExpiresAt()).getSeconds());
+    }
+
+    @Test
     void wrongPasswordReturnUnauthorized() throws Exception{
         savePerson();
         mockMvc.perform(post("/api/auth/login")
@@ -102,6 +125,40 @@ public class AuthControllerIT {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+    }
+
+    @Test
+    void wrongIssuerReturnsUnauthorized() throws Exception {
+        Instant now = Instant.now();
+        var claims = JwtClaimsSet.builder()
+                .issuer("wrong-issuer")
+                .subject("mario.rossi")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(3600))
+                .claim("personId", "1")
+                .claim("authorities", java.util.List.of("ROLE_user"))
+                .build();
+        var header = JwsHeader.with(MacAlgorithm.HS256).build();
+        String token = jwtEncoder.encode(
+                JwtEncoderParameters.from(header, claims)).getTokenValue();
+        mockMvc.perform(get("/api/account")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tamperedSignatureReturnsUnauthorized() throws Exception {
+        savePerson();
+        String token = loginAndGetToken();
+
+        String[] parts = token.split("\\.");
+        char replacement = parts[2].charAt(0) == 'A' ? 'B' : 'A';
+        String tampered = parts[0] + "." + parts[1] + "."
+                + replacement + parts[2].substring(1);
+
+        mockMvc.perform(get("/api/account")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tampered))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

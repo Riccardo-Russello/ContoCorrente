@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(PersonController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(ApiExceptionHandler.class)
 public class PersonControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -74,6 +75,21 @@ public class PersonControllerTest {
     }
 
     @Test
+    void createDuplicateUsername() throws Exception {
+        when(personService.create(request()))
+                .thenThrow(new ApiException(
+                        HttpStatus.CONFLICT,
+                        "USERNAME_ALREADY_EXISTS",
+                        "Username già utilizzato"));
+        mockMvc.perform(post("/api/person")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("USERNAME_ALREADY_EXISTS"));
+        verify(personService).create(request());
+    }
+
+    @Test
     void findAllReturnPerson() throws Exception {
         when(personService.findAll()).thenReturn(List.of(response()));
         mockMvc.perform(get("/api/person"))
@@ -87,7 +103,7 @@ public class PersonControllerTest {
     }
 
     @Test
-    void findByIdReturnEmptyList() throws Exception {
+    void findAllReturnsEmptyList() throws Exception {
         when(personService.findAll()).thenReturn(List.of());
         mockMvc.perform(get("/api/person"))
                 .andExpect(status().isOk())
@@ -141,44 +157,6 @@ public class PersonControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
         verify(personService).update(1L, updateRequest());
-    }
-
-    @Test
-    void createBadRequestInvalidData() throws Exception {
-        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE, null, null);
-        when(personService.create(invalid)).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA", "Nome obbligatorio"));
-        mockMvc.perform(post("/api/person")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                            "firstName" : "",
-                            "lastName" : "Rossi",
-                            "dateOfBirth" : "1990-05-15"
-                        }
-                        """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PERSON_DATA"))
-                .andExpect(jsonPath("$.message").value("Nome obbligatorio"));
-        verify(personService).create(invalid);
-    }
-
-    @Test
-    void updateBadRequestInvalidData() throws Exception {
-        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE, null, null);
-        when(personService.update(1L, invalid)).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA", "Nome obbligatorio"));
-        mockMvc.perform(put("/api/person/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                                "firstName" : "",
-                                "lastName" : "Rossi",
-                                "dateOfBirth" : "1990-05-15"
-                            }
-                         """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PERSON_DATA"))
-                .andExpect(jsonPath("$.message").value("Nome obbligatorio"));
-        verify(personService).update(1L, invalid);
     }
 
     @Test

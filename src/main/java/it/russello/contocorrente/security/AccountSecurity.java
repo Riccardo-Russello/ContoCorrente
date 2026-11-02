@@ -1,14 +1,10 @@
 package it.russello.contocorrente.security;
 
-import com.sun.jdi.LongValue;
 import it.russello.contocorrente.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
-import com.sun.jdi.LongValue;
-import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 

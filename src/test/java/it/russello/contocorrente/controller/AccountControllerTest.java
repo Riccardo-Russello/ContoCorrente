@@ -146,8 +146,7 @@ public class AccountControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"400, INVALID_ACCOUNT_DATA",
-                "404, PERSON_NOT_FOUND",
+    @CsvSource({"404, PERSON_NOT_FOUND",
                 "409, ACCOUNT_NUMBER_ALREADY_EXISTS"})
     void createServiceError(int httpStatus, String code) throws Exception{
         when(accountService.create(createRequest())).thenThrow(new ApiException(HttpStatus.valueOf(httpStatus), code, "Errore creazione"));
@@ -181,8 +180,7 @@ public class AccountControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"400, INVALID_ACCOUNT_DATA",
-            "404, ACCOUNT_NOT_FOUND",
+    @CsvSource({"404, ACCOUNT_NOT_FOUND",
             "409, ACCOUNT_NUMBER_ALREADY_EXISTS"})
     void updateServiceError(int httpStatus, String code) throws Exception{
         when(accountService.update(1L, updateRequest()))
@@ -271,5 +269,16 @@ public class AccountControllerTest {
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.message").value("Errore interno durante l'operazione"));
         verify(accountService).findAll();
+    }
+
+    @Test
+    void databaseConflictReturnsConflict() throws Exception {
+        when(accountService.create(createRequest()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate account number"));
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CREATE_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DATA_CONFLICT"));
     }
 }

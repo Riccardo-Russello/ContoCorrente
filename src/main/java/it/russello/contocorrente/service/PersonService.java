@@ -67,7 +67,7 @@ public class PersonService {
         }
 
         personRepository.delete(person);
-        personRepository.flush();       // Forza l'esecuzione della cancellazione prima dell'uscita dal metodo
+        personRepository.flush();
     }
 
     private Person requirePerson(Long id) {
