@@ -17,6 +17,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -98,18 +103,26 @@ public class PersonServiceTest {
         Person first = person(1L);
         Person second = new Person("Anna", "Bianchi", LocalDate.of(1985, 1, 10));
         ReflectionTestUtils.setField(second, "id", 2L);
-        when(personRepository.findAll()).thenReturn(List.of(first, second));
-        List<PersonResponse> responses = personService.findAll();
-
-        assertEquals(List.of(PersonResponse.from(first), PersonResponse.from(second)), responses);
-        verify(personRepository).findAll();
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(personRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+        Page<PersonResponse> responses = personService.findAll(pageable);
+        assertEquals(List.of(PersonResponse.from(first), PersonResponse.from(second)), responses.getContent());
+        assertEquals(0, responses.getNumber());
+        assertEquals(10, responses.getSize());
+        assertEquals(2L, responses.getTotalElements());
+        assertEquals(1, responses.getTotalPages());
+        verify(personRepository).findAll(pageable);
     }
 
     @Test
-    void findAllReturnsEmptyList(){
-        when(personRepository.findAll()).thenReturn(List.of());
-        assertTrue(personService.findAll().isEmpty());
-        verify(personRepository).findAll();
+    void findAllReturnsEmptyPage(){
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(personRepository.findAll(pageable)).thenReturn(Page.empty(pageable));
+        Page<PersonResponse> responses = personService.findAll(pageable);
+        assertTrue(responses.isEmpty());
+        assertEquals(0, responses.getTotalElements());
+        assertEquals(0, responses.getTotalPages());
+        verify(personRepository).findAll(pageable);
     }
 
     @Test

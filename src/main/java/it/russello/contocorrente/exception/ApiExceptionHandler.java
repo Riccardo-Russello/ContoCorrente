@@ -10,10 +10,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import it.russello.contocorrente.dto.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @ControllerAdvice
 public class ApiExceptionHandler {
-
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
     public record ErrorResponse(String code, String message) {
     }
 
@@ -55,6 +57,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleInternalError(Exception exception) {
+        log.error("Errore interno durante l'operazione", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(
                         "INTERNAL_ERROR",

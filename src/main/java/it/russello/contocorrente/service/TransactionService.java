@@ -23,7 +23,6 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('admin')")
 public class TransactionService {
     private final AccountRepository accountRepository;
     private final AccountTransactionRepository accountTransactionRepository;

@@ -11,8 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.access.prepost.PreAuthorize;
-
-import java.util.List;
+import it.russello.contocorrente.security.AccountSecurity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,32 +22,36 @@ public class PersonService {
     private final PersonRepository personRepository;
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccountSecurity accountSecurity;
 
     @PreAuthorize("isAnonymous() or hasRole('admin')")
     public PersonResponse create(PersonRequest request) {
         if(personRepository.existsByUsername(request.username())) {
             throw  new ApiException(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "Username già utilizzato");
         }
-
         Person person = new Person(request.firstName(), request.lastName(), request.dateOfBirth());
         person.setUsername(request.username());
         person.setPassword(passwordEncoder.encode(request.password()));
-
         Person savedPerson = personRepository.save(person);
         return PersonResponse.from(savedPerson);
     }
 
     @PreAuthorize("hasRole('admin')")
-    public List<PersonResponse> findAll() {
-        return personRepository.findAll()
-                .stream()
-                .map(PersonResponse::from)
-                .toList();
+    @Transactional(readOnly = true)
+    public Page<PersonResponse> findAll(Pageable pageable) {
+        return personRepository.findAll(pageable)
+                .map(PersonResponse::from);
     }
 
     @PreAuthorize("hasRole('admin')")
     public PersonResponse findById(Long id) {
         return PersonResponse.from(requirePerson(id));
+    }
+
+    @PreAuthorize("hasAnyRole('admin', 'user')")
+    public PersonResponse findById(){
+        Long personId = accountSecurity.currentPersonId();
+        return PersonResponse.from(requirePerson(personId));
     }
 
     @PreAuthorize("hasRole('admin')")

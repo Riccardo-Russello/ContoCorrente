@@ -182,15 +182,19 @@ class AuthorizationIT {
     void userListContainsOnlyOwnAccounts() throws Exception {
         mockMvc.perform(get("/api/account").with(user(other.getId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(destination.getId()));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(destination.getId()))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
     }
 
     @Test
     void adminListContainsAccountsOfBothPersons() throws Exception {
         mockMvc.perform(get("/api/account").with(admin(owner.getId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(3));
+                .andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(1));
     }
 
     @Test
@@ -220,7 +224,7 @@ class AuthorizationIT {
 
     @Test
     void authenticatedUserCannotRegisterAnotherPerson() throws Exception {
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                         .with(user(owner.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

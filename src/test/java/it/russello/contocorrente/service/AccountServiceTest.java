@@ -24,6 +24,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import it.russello.contocorrente.security.AccountSecurity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -175,31 +180,48 @@ public class AccountServiceTest {
         Account second = account(2L);
         second.setAccountNumber("ACC-002");
         second.setBalance(new BigDecimal("50.00"));
-        when(accountRepository.findAll()).thenReturn(List.of(first,second));
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
         when(accountSecurity.isAdmin()).thenReturn(true);
+        when(accountRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+        Page<AccountResponse> responses = accountService.findAll(pageable);
         assertEquals(List.of(new AccountResponse(1L, 10L, "ACC-001", OPENED_AT, new BigDecimal("0.00")),
                 new AccountResponse(2L, 10L, "ACC-002", OPENED_AT, new BigDecimal("50.00"))),
-                accountService.findAll());
-        verify(accountRepository).findAll();
+                responses.getContent());
+        assertEquals(0, responses.getNumber());
+        assertEquals(10, responses.getSize());
+        assertEquals(2L, responses.getTotalElements());
+        assertEquals(1, responses.getTotalPages());
+        verify(accountRepository).findAll(pageable);
+        verify(accountRepository, never()).findByPerson_Id(anyLong(), any(Pageable.class));
     }
 
     @Test
     void userFindAllReturnOwnAccounts(){
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        Account ownAccount = account(1L);
         when(accountSecurity.isAdmin()).thenReturn(false);
         when(accountSecurity.currentPersonId()).thenReturn(10L);
-        when(accountRepository.findByPerson_Id(10L)).thenReturn(List.of(account(1L)));
-        assertEquals(List.of(AccountResponse.from(account(1L))), accountService.findAll());
-        verify(accountRepository).findByPerson_Id(10L);
-        verify(accountRepository, never()).findAll();
+        when(accountRepository.findByPerson_Id(10L, pageable)).thenReturn(new PageImpl<>(List.of(ownAccount), pageable, 1));
+        Page<AccountResponse> responses = accountService.findAll(pageable);
+        assertEquals(List.of(AccountResponse.from(ownAccount)), responses.getContent());
+        assertEquals(1L, responses.getTotalElements());
+        assertEquals(1, responses.getTotalPages());
+        verify(accountRepository).findByPerson_Id(10L, pageable);
+        verify(accountRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test
     void userWithoutAccountGetsEmptyList(){
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
         when(accountSecurity.isAdmin()).thenReturn(false);
         when(accountSecurity.currentPersonId()).thenReturn(10L);
-        when(accountRepository.findByPerson_Id(10L)).thenReturn(List.of());
-        assertTrue(accountService.findAll().isEmpty());
-        verify(accountRepository, never()).findAll();
+        when(accountRepository.findByPerson_Id(10L, pageable)).thenReturn(Page.empty(pageable));
+        Page<AccountResponse> responses = accountService.findAll(pageable);
+        assertTrue(responses.isEmpty());
+        assertEquals(0L, responses.getTotalElements());
+        assertEquals(0, responses.getTotalPages());
+        verify(accountRepository).findByPerson_Id(10L, pageable);
+        verify(accountRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test

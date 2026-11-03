@@ -17,13 +17,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.parameters.P;
 import it.russello.contocorrente.security.AccountSecurity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('admin')")
 public class AccountService {
     private final AccountRepository accountRepository;
     private final PersonRepository personRepository;
@@ -51,17 +52,16 @@ public class AccountService {
     }
 
     @PreAuthorize("hasAnyRole('admin', 'user')")
-    public List<AccountResponse> findAll() {
-        List<Account> accounts;
+    @Transactional(readOnly = true)
+    public Page<AccountResponse> findAll(Pageable pageable) {
+        Page<Account> accounts;
         if(accountSecurity.isAdmin()){
-            accounts = accountRepository.findAll();
+            accounts = accountRepository.findAll(pageable);
         }else{
             Long personId = accountSecurity.currentPersonId();
-            accounts = accountRepository.findByPerson_Id(personId);
+            accounts = accountRepository.findByPerson_Id(personId, pageable);
         }
-        return accounts.stream()
-                .map(AccountResponse::from)
-                .toList();
+        return accounts.map(AccountResponse::from);
     }
 
     @PreAuthorize("""
@@ -80,7 +80,7 @@ public class AccountService {
         return AccountBalanceResponse.from(account);
     }
 
-
+    @PreAuthorize("hasRole('admin')")
     public AccountResponse update(Long id, AccountUpdateRequest request) {
         Account account = requireAccount(id);
         if (accountRepository.existsByAccountNumberAndIdNot(
@@ -92,7 +92,7 @@ public class AccountService {
         return AccountResponse.from(savedAccount);
     }
 
-
+    @PreAuthorize("hasRole('admin')")
     public void delete(Long id) {
         Account account = requireAccount(id);
         if (account.getBalance().compareTo(BigDecimal.ZERO) != 0) {

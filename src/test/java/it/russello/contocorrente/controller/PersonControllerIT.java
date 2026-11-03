@@ -42,7 +42,7 @@ public class PersonControllerIT {
     @Test
     void createPerson() throws Exception {
         long counterBefore = personRepository.count();
-        var response = mockMvc.perform(post("/api/person")
+        var response = mockMvc.perform(post("/api/auth/signup")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -84,11 +84,15 @@ public class PersonControllerIT {
         Long id = person.getId();
         mockMvc.perform(get("/api/person").with(admin(1L)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(id))
-                .andExpect(jsonPath("$[0].firstName").value("Mario"))
-                .andExpect(jsonPath("$[0].lastName").value("Rossi"))
-                .andExpect(jsonPath("$[0].dateOfBirth").value("1990-05-15"));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(id))
+                .andExpect(jsonPath("$.content[0].firstName").value("Mario"))
+                .andExpect(jsonPath("$.content[0].lastName").value("Rossi"))
+                .andExpect(jsonPath("$.content[0].dateOfBirth").value("1990-05-15"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
     }
 
     @Test

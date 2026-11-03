@@ -19,6 +19,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -76,25 +81,52 @@ public class AccountControllerTest {
 
     @Test
     void findAllAccounts() throws Exception{
-        when(accountService.findAll()).thenReturn(List.of(response("ACC-001")));
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(accountService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response("ACC-001")), pageable, 1));
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].personId").value(10))
-                .andExpect(jsonPath("$[0].accountNumber").value("ACC-001"))
-                .andExpect(jsonPath("$[0].openedAt").value("2026-01-10T12:00:00"))
-                .andExpect(jsonPath("$[0].balance").value(125.50));
-        verify(accountService).findAll();
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].personId").value(10))
+                .andExpect(jsonPath("$.content[0].accountNumber").value("ACC-001"))
+                .andExpect(jsonPath("$.content[0].openedAt").value("2026-01-10T12:00:00"))
+                .andExpect(jsonPath("$.content[0].balance").value(125.50))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+        verify(accountService).findAll(pageable);
     }
 
     @Test
     void findAllEmpty() throws Exception{
-        when(accountService.findAll()).thenReturn(List.of());
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(accountService.findAll(pageable)).thenReturn(Page.empty(pageable));
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk())
-                .andExpect(content().json("[]"));
-        verify(accountService).findAll();
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+        verify(accountService).findAll(pageable);
+    }
+
+    @Test
+    void findAllUsesRequestedPaginationAndSort() throws Exception {
+        Pageable pageable = PageRequest.of(1, 1, Sort.by(Sort.Direction.DESC, "balance"));
+        when(accountService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response("ACC-001")), pageable, 3));
+        mockMvc.perform(get(BASE_URL)
+                        .param("page", "1")
+                        .param("size", "1")
+                        .param("sort", "balance,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        verify(accountService).findAll(pageable);
     }
 
     @Test
@@ -263,12 +295,12 @@ public class AccountControllerTest {
 
     @Test
     void unexpectedInternalError() throws Exception{
-        when(accountService.findAll()).thenThrow(new RuntimeException("Errore database"));
+        when(accountService.findAll(any(Pageable.class))).thenThrow(new RuntimeException("Errore database"));
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.message").value("Errore interno durante l'operazione"));
-        verify(accountService).findAll();
+        verify(accountService).findAll(any(Pageable.class));
     }
 
     @Test

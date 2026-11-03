@@ -132,12 +132,45 @@ public class AccountControllerIT {
         entityManager.clear();
         mockMvc.perform(get("/api/account").with(admin(person.getId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(account.getId()))
-                .andExpect(jsonPath("$[0].personId").value(person.getId()))
-                .andExpect(jsonPath("$[0].accountNumber").value("ACC-001"))
-                .andExpect(jsonPath("$[0].openedAt").isNotEmpty())
-                .andExpect(jsonPath("$[0].balance").value(0.0));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(account.getId()))
+                .andExpect(jsonPath("$.content[0].personId").value(person.getId()))
+                .andExpect(jsonPath("$.content[0].accountNumber").value("ACC-001"))
+                .andExpect(jsonPath("$.content[0].openedAt").isNotEmpty())
+                .andExpect(jsonPath("$.content[0].balance").value(0.0))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+    }
+
+    @Test
+    void findAllPaginatesAndSortsAccounts() throws Exception {
+        accountRepository.saveAndFlush(new Account(person, "ACC-001"));
+        accountRepository.saveAndFlush(new Account(person, "ACC-002"));
+        accountRepository.saveAndFlush(new Account(person, "ACC-003"));
+        entityManager.clear();
+        mockMvc.perform(get("/api/account")
+                        .with(admin(person.getId()))
+                        .param("page", "1")
+                        .param("size", "1")
+                        .param("sort", "accountNumber,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].accountNumber").value("ACC-002"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        mockMvc.perform(get("/api/account")
+                        .with(admin(person.getId()))
+                        .param("page", "3")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(3))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
     }
 
     @Test

@@ -12,8 +12,11 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-
-import java.util.List;
+import it.russello.contocorrente.dto.PageResponse;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
 
 @Tag(name = "Conti corrente", description = "Gestione dei conti corrente")
 @RestController
@@ -31,10 +34,14 @@ public class AccountController {
                 .body(response);
     }
 
-    @Operation(summary = "Elenca tutti i conti correnti")
+    @Operation(summary = "Elenca i conti correnti con paginazione")
     @GetMapping
-    public ResponseEntity<List<AccountResponse>> findAll() {
-        return ResponseEntity.status(HttpStatus.OK).body(accountService.findAll());
+    public ResponseEntity<PageResponse<AccountResponse>> findAll(
+            @ParameterObject
+            @PageableDefault(page = 0, size = 10, sort = "id", direction = Sort.Direction.ASC)
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(PageResponse.from(accountService.findAll(pageable)));
     }
 
     @Operation(summary = "Cerca un conto per ID")

@@ -65,7 +65,7 @@ public class AuthControllerIT {
 
     @Test
     void registrationPublicAndStoresCryptedPassword() throws Exception{
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -215,7 +215,7 @@ public class AuthControllerIT {
     @Test
     void duplicateUsernameReturnsConflict() throws Exception{
         savePerson();
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

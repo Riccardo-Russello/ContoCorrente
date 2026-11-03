@@ -68,7 +68,7 @@ public class ControllerValidationTest {
         String birth = "1990-05-15";
 
         for (String method : List.of("POST", "PUT")) {
-            String url = method.equals("POST") ? "/api/person" : "/api/person/1";
+            String url = method.equals("POST") ? "/api/auth/signup" : "/api/person/1";
             String username = method.equals("POST") ? "mario.rossi" : null;
             String password = method.equals("POST") ? "Password123!" : null;
             for (String invalid : new String[]{null, "", "   ", "a".repeat(31)}) {
@@ -85,13 +85,13 @@ public class ControllerValidationTest {
             }
         }
         for (String username : new String[]{null, "", "   ", "ab", "a".repeat(31), "mario_rossi", "mario rossi"}) {
-            cases.add(new InvalidRequest("POST", "/api/person",
+            cases.add(new InvalidRequest("POST", "/api/auth/signup",
                     person("Mario", "Rossi", birth, username, "Password123!"),
                     "INVALID_PERSON_DATA"));
         }
         for (String password : new String[]{
                 null, "", "        ", "1234567", "a".repeat(73), "è".repeat(37)}) {
-            cases.add(new InvalidRequest("POST", "/api/person",
+            cases.add(new InvalidRequest("POST", "/api/auth/signup",
                     person("Mario", "Rossi", birth, "mario.rossi", password),
                     "INVALID_PERSON_DATA"));
         }
@@ -188,7 +188,7 @@ public class ControllerValidationTest {
 
         // Proprietà JSON sconosciute.
         for (String url : List.of(
-                "/api/person",
+                "/api/auth/signup",
                 "/api/account",
                 "/api/account/1/transaction",
                 "/api/account/1/transaction/transfer",

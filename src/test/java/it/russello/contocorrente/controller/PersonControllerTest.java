@@ -14,6 +14,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import it.russello.contocorrente.service.AuthService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 
-@WebMvcTest(PersonController.class)
+@WebMvcTest({PersonController.class, AuthController.class})
 @AutoConfigureMockMvc(addFilters = false)
 @Import(ApiExceptionHandler.class)
 public class PersonControllerTest {
@@ -32,6 +38,8 @@ public class PersonControllerTest {
     private MockMvc mockMvc;
     @MockitoBean
     private PersonService personService;
+    @MockitoBean
+    private AuthService authService;
 
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 5, 15);
     private static final String VALID_JSON = """
@@ -63,7 +71,7 @@ public class PersonControllerTest {
     @Test
     void createValidPerson() throws Exception {
         when(personService.create(request())).thenReturn(response());
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(VALID_JSON))
                 .andExpect(status().isCreated())
@@ -81,7 +89,7 @@ public class PersonControllerTest {
                         HttpStatus.CONFLICT,
                         "USERNAME_ALREADY_EXISTS",
                         "Username già utilizzato"));
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_JSON))
                 .andExpect(status().isConflict())
@@ -91,26 +99,52 @@ public class PersonControllerTest {
 
     @Test
     void findAllReturnPerson() throws Exception {
-        when(personService.findAll()).thenReturn(List.of(response()));
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(personService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response()), pageable, 1));
         mockMvc.perform(get("/api/person"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].firstName").value("Mario"))
-                .andExpect(jsonPath("$[0].lastName").value("Rossi"))
-                .andExpect(jsonPath("$[0].dateOfBirth").value("1990-05-15"));
-        verify(personService).findAll();
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].firstName").value("Mario"))
+                .andExpect(jsonPath("$.content[0].lastName").value("Rossi"))
+                .andExpect(jsonPath("$.content[0].dateOfBirth").value("1990-05-15"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+        verify(personService).findAll(pageable);
     }
 
     @Test
     void findAllReturnsEmptyList() throws Exception {
-        when(personService.findAll()).thenReturn(List.of());
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(personService.findAll(pageable)).thenReturn(Page.empty(pageable));
         mockMvc.perform(get("/api/person"))
                 .andExpect(status().isOk())
-                .andExpect(content().json("[]"));
-        verify(personService).findAll();
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+        verify(personService).findAll(pageable);
     }
 
+    @Test
+    void findAllUsesRequestedPaginationAndSorts() throws Exception {
+        Pageable pageable = PageRequest.of(1, 1, Sort.by(Sort.Direction.DESC, "lastName"));
+        when(personService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response()), pageable, 3));
+        mockMvc.perform(get("/api/person")
+                    .param("page", "1")
+                    .param("size", "1")
+                    .param("sort", "lastName,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        verify(personService).findAll(pageable);
+    }
 
     @Test
     void findById() throws Exception {
@@ -190,7 +224,7 @@ public class PersonControllerTest {
 
     @Test
     void createRejectJsonMalformed() throws Exception {
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{"))
                 .andExpect(status().isBadRequest())
@@ -200,7 +234,7 @@ public class PersonControllerTest {
 
     @Test
     void createInvalidDateFormat() throws Exception {
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -216,7 +250,7 @@ public class PersonControllerTest {
 
     @Test
     void createMissingBody() throws Exception {
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -233,7 +267,7 @@ public class PersonControllerTest {
 
     @Test
     void unexpectedInternalError() throws Exception {
-        when(personService.findAll()).thenThrow(new RuntimeException("Errore interno"));
+        when(personService.findAll(any(Pageable.class))).thenThrow(new RuntimeException("Errore interno"));
         mockMvc.perform(get("/api/person"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
