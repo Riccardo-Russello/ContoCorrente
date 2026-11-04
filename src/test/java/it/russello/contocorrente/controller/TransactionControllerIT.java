@@ -19,18 +19,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static it.russello.contocorrente.support.TestJwt.admin;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-import org.springframework.transaction.annotation.Transactional;
-
+import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -52,7 +51,7 @@ public class TransactionControllerIT {
     private Account destination;
 
     @BeforeEach
-    void setUp(){
+    void setUp() {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword("passwmario");
@@ -71,13 +70,13 @@ public class TransactionControllerIT {
     void createTransaction(String type, BigDecimal expectedBalance) throws Exception {
         long counterBefore = transactionRepository.count();
         var response = mockMvc.perform(post("/api/account/{id}/transaction", source.getId()).with(admin(source.getPerson().getId()))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
-                                        {
-                                            "amount": 25.00,
-                                            "type": "%s"
-                                        }
-                                        """.formatted(type)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "amount": 25.00,
+                                    "type": "%s"
+                                }
+                                """.formatted(type)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.type").value(type))
@@ -104,24 +103,24 @@ public class TransactionControllerIT {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void transfer(boolean dedicatedEndpoint)  throws Exception {
+    void transfer(boolean dedicatedEndpoint) throws Exception {
         long counterBefore = transactionRepository.count();
         String url = "/api/account/{id}/transaction" + (dedicatedEndpoint ? "/transfer" : "");
         String json = dedicatedEndpoint ? """
-                  {
-                      "destinationAccountId": %d,
-                      "amount": 25.00
-                  }
-                  """.formatted(destination.getId())
+                {
+                    "destinationAccountId": %d,
+                    "amount": 25.00
+                }
+                """.formatted(destination.getId())
                 : """
-                  {
-                      "type": "TRANSFER",
-                      "to": %d,
-                      "amount": 25.00
-                  }
-                  """.formatted(destination.getId());
+                {
+                    "type": "TRANSFER",
+                    "to": %d,
+                    "amount": 25.00
+                }
+                """.formatted(destination.getId());
         var response = mockMvc.perform(post(url, source.getId()).with(admin(source.getPerson().getId()))
-                                .contentType(MediaType.APPLICATION_JSON).content(json))
+                        .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.type").value("TRANSFER"))
@@ -151,24 +150,24 @@ public class TransactionControllerIT {
     }
 
     @Test
-    void getLastFiveTransactions() throws Exception{
+    void getLastFiveTransactions() throws Exception {
         var transactions = new ArrayList<AccountTransaction>();
-        for(int i=1; i<=6; i++){
+        for (int i = 1; i <= 6; i++) {
             transactions.add(transactionRepository.saveAndFlush(
                     new AccountTransaction(source, TransactionType.DEPOSIT, BigDecimal.valueOf(i))));
         }
         transactions.add(transactionRepository.saveAndFlush(
                 new AccountTransaction(destination, source, new BigDecimal("10.00"))));
         transactionRepository.saveAndFlush(
-                new AccountTransaction(destination, TransactionType.DEPOSIT, new  BigDecimal("99.00")));
+                new AccountTransaction(destination, TransactionType.DEPOSIT, new BigDecimal("99.00")));
         transactions.sort(Comparator.comparing(AccountTransaction::getOccurredAt)
-                        .thenComparing(AccountTransaction::getId)
-                        .reversed());
+                .thenComparing(AccountTransaction::getId)
+                .reversed());
         entityManager.clear();
         var result = mockMvc.perform(get("/api/account/{id}/transaction", source.getId()).with(admin(source.getPerson().getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(5));
-        for(int i=0; i<5; i++){
+        for (int i = 0; i < 5; i++) {
             AccountTransaction expected = transactions.get(i);
             String path = "$[" + i + "]";
             result.andExpect(jsonPath(path + ".id").value(expected.getId()))
@@ -188,7 +187,7 @@ public class TransactionControllerIT {
     }
 
     @Test
-    void getLastFiveTransactionsEmpty() throws Exception{
+    void getLastFiveTransactionsEmpty() throws Exception {
         mockMvc.perform(get("/api/account/{id}/transaction", source.getId()).with(admin(source.getPerson().getId())))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
@@ -207,8 +206,8 @@ public class TransactionControllerIT {
                         .with(admin(source.getPerson().getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {"type":"%s","amount":%s}
-                            """.formatted(type, amount.toPlainString())))
+                                {"type":"%s","amount":%s}
+                                """.formatted(type, amount.toPlainString())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(code));
         assertStateUnchanged(initialBalance, new BigDecimal("50.00"), before);
@@ -235,11 +234,11 @@ public class TransactionControllerIT {
         long before = transactionRepository.count();
         String url = "/api/account/{id}/transaction" + (dedicatedEndpoint ? "/transfer" : "");
         String json = dedicatedEndpoint ? """
-              {"destinationAccountId":%d,"amount":%s}
-              """.formatted(targetId, amount)
+                {"destinationAccountId":%d,"amount":%s}
+                """.formatted(targetId, amount)
                 : """
-              {"type":"TRANSFER","to":%d,"amount":%s}
-              """.formatted(targetId, amount);
+                {"type":"TRANSFER","to":%d,"amount":%s}
+                """.formatted(targetId, amount);
         mockMvc.perform(post(url, source.getId())
                         .with(admin(source.getPerson().getId()))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -261,11 +260,11 @@ public class TransactionControllerIT {
         String url = "/api/account/{id}/transaction" + (dedicatedEndpoint ? "/transfer" : "");
         String json = dedicatedEndpoint
                 ? """
-              {"destinationAccountId":%d,"amount":10.00}
-              """.formatted(targetId)
+                {"destinationAccountId":%d,"amount":10.00}
+                """.formatted(targetId)
                 : """
-              {"type":"TRANSFER","to":%d,"amount":10.00}
-              """.formatted(targetId);
+                {"type":"TRANSFER","to":%d,"amount":10.00}
+                """.formatted(targetId);
         mockMvc.perform(post(url, sourceId)
                         .with(admin(source.getPerson().getId()))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -284,8 +283,8 @@ public class TransactionControllerIT {
                 : post("/api/account/{id}/transaction", Long.MAX_VALUE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                            {"type":"DEPOSIT","amount":10.00}
-                            """);
+                        {"type":"DEPOSIT","amount":10.00}
+                        """);
         mockMvc.perform(request.with(admin(source.getPerson().getId())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
@@ -296,9 +295,9 @@ public class TransactionControllerIT {
     private void assertStateUnchanged(BigDecimal expectedSource, BigDecimal expectedDestination, long expectedTransactions) {
         entityManager.clear();
         assertEquals(0, expectedSource.compareTo(accountRepository.findById(source.getId())
-                        .orElseThrow().getBalance()));
+                .orElseThrow().getBalance()));
         assertEquals(0, expectedDestination.compareTo(accountRepository.findById(destination.getId())
-                        .orElseThrow().getBalance()));
+                .orElseThrow().getBalance()));
         assertEquals(expectedTransactions, transactionRepository.count());
     }
 }

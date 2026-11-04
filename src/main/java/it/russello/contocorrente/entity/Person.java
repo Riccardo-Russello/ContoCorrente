@@ -1,16 +1,17 @@
 package it.russello.contocorrente.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "person")
-@Getter @NoArgsConstructor
+@Getter
+@NoArgsConstructor
 public class Person {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

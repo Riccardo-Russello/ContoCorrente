@@ -1,22 +1,18 @@
 package it.russello.contocorrente.controller;
 
-import it.russello.contocorrente.dto.AccountBalanceResponse;
-import it.russello.contocorrente.dto.AccountCreateRequest;
-import it.russello.contocorrente.dto.AccountResponse;
-import it.russello.contocorrente.dto.AccountUpdateRequest;
-import it.russello.contocorrente.service.AccountService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import it.russello.contocorrente.dto.PageResponse;
+import it.russello.contocorrente.dto.*;
+import it.russello.contocorrente.service.AccountService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Conti corrente", description = "Gestione dei conti corrente")
 @RestController
@@ -28,7 +24,7 @@ public class AccountController {
     @Operation(summary = "Crea un conto corrente")
     @PostMapping
     public ResponseEntity<AccountResponse> create(
-             @Valid @RequestBody AccountCreateRequest request) {
+            @Valid @RequestBody AccountCreateRequest request) {
         AccountResponse response = accountService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(response);
@@ -53,7 +49,7 @@ public class AccountController {
 
     @Operation(summary = "Visualizza il saldo di  un conto")
     @GetMapping("/{id}/balance")
-    public ResponseEntity<AccountBalanceResponse> getBalance(@PathVariable("id") Long id){
+    public ResponseEntity<AccountBalanceResponse> getBalance(@PathVariable("id") Long id) {
         return ResponseEntity.status(HttpStatus.OK).body(accountService.getBalance(id));
     }
 

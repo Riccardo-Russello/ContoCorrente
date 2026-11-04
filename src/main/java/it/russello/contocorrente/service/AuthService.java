@@ -3,6 +3,7 @@ package it.russello.contocorrente.service;
 import it.russello.contocorrente.dto.LoginRequest;
 import it.russello.contocorrente.dto.LoginResponse;
 import it.russello.contocorrente.exception.ApiException;
+import it.russello.contocorrente.repository.PersonRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,7 +16,6 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
-import it.russello.contocorrente.repository.PersonRepository;
 
 import java.time.Instant;
 import java.util.List;
@@ -33,16 +33,17 @@ public class AuthService {
         this.issuer = issuer;
         this.personRepository = personRepository;
     }
-    public LoginResponse login(LoginRequest request){
+
+    public LoginResponse login(LoginRequest request) {
         String username;
         List<String> authorities;
-        try{
+        try {
             var authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(
                             request.username(), request.password()));
             username = authentication.getName();
             authorities = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
-        }catch(AuthenticationException e){
+        } catch (AuthenticationException e) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "USername o password non corretti");
         }
         Long personId = personRepository.findByUsername(username).orElseThrow(() -> new ApiException(

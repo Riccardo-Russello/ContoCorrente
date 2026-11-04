@@ -8,26 +8,18 @@ import it.russello.contocorrente.repository.AccountRepository;
 import it.russello.contocorrente.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,14 +37,27 @@ public class PersonServiceTest {
     @InjectMocks
     private PersonService personService;
 
-    private static Person person(Long id){
+    private static Person person(Long id) {
         Person person = new Person("Mario", "Rossi", BIRTH_DATE);
         ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 
+    private static PersonRequest validRequest() {
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
+    }
+
+    private static PersonRequest validUpdateRequest() {
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, null, null);
+    }
+
+    private static void assertApiError(ApiException exception, HttpStatus status, String code) {
+        assertEquals(status, exception.getStatus());
+        assertEquals(code, exception.getCode());
+    }
+
     @Test
-    void createValidPerson(){
+    void createValidPerson() {
         Person saved = person(1L);
         when(personRepository.save(any(Person.class))).thenReturn(saved);
         when(passwordEncoder.encode("passwmario")).thenReturn("encoded-password");
@@ -73,9 +78,8 @@ public class PersonServiceTest {
         verifyNoInteractions(accountRepository);
     }
 
-
     @Test
-    void createWithExistingUsername(){
+    void createWithExistingUsername() {
         when(personRepository.existsByUsername("mario.rossi")).thenReturn(true);
         ApiException exception = assertThrows(ApiException.class, () -> personService.create(validRequest()));
         assertEquals(HttpStatus.CONFLICT, exception.getStatus());
@@ -85,9 +89,9 @@ public class PersonServiceTest {
     }
 
     @Test
-    void createNames30CharAndBirthDateToday(){
+    void createNames30CharAndBirthDateToday() {
         LocalDate today = LocalDate.now();
-        PersonRequest request = new PersonRequest("a".repeat(30),"b".repeat(30), today, "more30.char", "passwmario");
+        PersonRequest request = new PersonRequest("a".repeat(30), "b".repeat(30), today, "more30.char", "passwmario");
         when(personRepository.save(any(Person.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(passwordEncoder.encode("passwmario")).thenReturn("passwmario");
         PersonResponse response = personService.create(request);
@@ -99,7 +103,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void findAll(){
+    void findAll() {
         Person first = person(1L);
         Person second = new Person("Anna", "Bianchi", LocalDate.of(1985, 1, 10));
         ReflectionTestUtils.setField(second, "id", 2L);
@@ -115,7 +119,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void findAllReturnsEmptyPage(){
+    void findAllReturnsEmptyPage() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
         when(personRepository.findAll(pageable)).thenReturn(Page.empty(pageable));
         Page<PersonResponse> responses = personService.findAll(pageable);
@@ -126,7 +130,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void findByIdReturnsPerson(){
+    void findByIdReturnsPerson() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         PersonResponse response = personService.findById(1L);
@@ -136,7 +140,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void findByIdMissingPerson(){
+    void findByIdMissingPerson() {
         when(personRepository.findById(1L)).thenReturn(Optional.empty());
         ApiException exception = assertThrows(ApiException.class, () -> personService.findById(1L));
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
@@ -144,7 +148,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void updateExistingPerson(){
+    void updateExistingPerson() {
         Person existing = person(1L);
         PersonRequest request = new PersonRequest("Luigi", "Verdi", LocalDate.of(1988, 3, 20), null, null);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
@@ -159,7 +163,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void updateMissingPerson(){
+    void updateMissingPerson() {
         when(personRepository.findById(1L)).thenReturn(Optional.empty());
         ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, validUpdateRequest()));
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
@@ -168,7 +172,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void updateMustNotChangeCredentials(){
+    void updateMustNotChangeCredentials() {
         Person existing = person(1L);
         existing.setUsername("mario.rossi");
         existing.setPassword("encoded-password");
@@ -183,7 +187,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void deletePersonWithNoAccount(){
+    void deletePersonWithNoAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(accountRepository.existsByPerson_Id(1L)).thenReturn(false);
@@ -198,7 +202,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void deletePersonWithAccount(){
+    void deletePersonWithAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(accountRepository.existsByPerson_Id(1L)).thenReturn(true);
@@ -211,7 +215,7 @@ public class PersonServiceTest {
     }
 
     @Test
-    void deleteMissingPerson(){
+    void deleteMissingPerson() {
         when(personRepository.findById(1L)).thenReturn(Optional.empty());
 
         ApiException exception = assertThrows(ApiException.class, () -> personService.delete(1L));
@@ -221,16 +225,5 @@ public class PersonServiceTest {
         verifyNoMoreInteractions(accountRepository);
         verify(personRepository, never()).delete(any(Person.class));
         verify(personRepository, never()).flush();
-    }
-
-    private static PersonRequest validRequest(){
-        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
-    }
-    private static PersonRequest validUpdateRequest(){
-        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, null, null);
-    }
-    private static void assertApiError(ApiException exception, HttpStatus status, String code){
-        assertEquals(status, exception.getStatus());
-        assertEquals(code, exception.getCode());
     }
 }

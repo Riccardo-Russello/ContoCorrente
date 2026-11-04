@@ -17,7 +17,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -38,17 +41,18 @@ public class AuthServiceTest {
     @Mock
     PersonRepository personRepository;
     AuthService authService;
+
     @BeforeEach
     void setUp() {
         authService = new AuthService(authenticationManager, jwtEncoder, "test-issuer", personRepository);
     }
 
-    private Authentication authenticatedUser(){
+    private Authentication authenticatedUser() {
         return UsernamePasswordAuthenticationToken.authenticated("mario.rossi", null, List.of(new SimpleGrantedAuthority("ROLE_user")));
     }
 
     @Test
-    void loginAuthenticatedBuildExpectedToken(){
+    void loginAuthenticatedBuildExpectedToken() {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         ReflectionTestUtils.setField(person, "id", 10L);
         when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticatedUser());
@@ -82,7 +86,7 @@ public class AuthServiceTest {
     }
 
     @Test
-    void invalidCredentialsReturnUnauthorized(){
+    void invalidCredentialsReturnUnauthorized() {
         when(authenticationManager.authenticate(any(Authentication.class))).thenThrow(new BadCredentialsException("Invalid"));
         ApiException exception = assertThrows(ApiException.class, () -> authService.login(new LoginRequest("mario.rossi", "wrong")));
         assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatus());

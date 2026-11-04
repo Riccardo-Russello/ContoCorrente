@@ -1,25 +1,22 @@
 package it.russello.contocorrente.controller;
 
+import it.russello.contocorrente.entity.Account;
 import it.russello.contocorrente.entity.Person;
+import it.russello.contocorrente.repository.AccountRepository;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static it.russello.contocorrente.support.TestJwt.admin;
-import it.russello.contocorrente.entity.Account;
-import it.russello.contocorrente.repository.AccountRepository;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
 
 import java.time.LocalDate;
 
+import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -43,16 +40,16 @@ public class PersonControllerIT {
     void createPerson() throws Exception {
         long counterBefore = personRepository.count();
         var response = mockMvc.perform(post("/api/auth/signup")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                        {
-                            "firstName" : "Mario",
-                            "lastName" : "Rossi",
-                            "dateOfBirth" : "1990-05-15",
-                            "username" : "mario.rossi",
-                            "password" : "passwmario"
-                        }
-                        """))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "firstName" : "Mario",
+                                    "lastName" : "Rossi",
+                                    "dateOfBirth" : "1990-05-15",
+                                    "username" : "mario.rossi",
+                                    "password" : "passwmario"
+                                }
+                                """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.firstName").value("Mario"))
@@ -76,7 +73,7 @@ public class PersonControllerIT {
     }
 
     @Test
-    void findAllPerson() throws Exception{
+    void findAllPerson() throws Exception {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword("passwmario");
@@ -96,7 +93,7 @@ public class PersonControllerIT {
     }
 
     @Test
-    void findPersonById() throws Exception{
+    void findPersonById() throws Exception {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword("passwmario");
@@ -113,7 +110,7 @@ public class PersonControllerIT {
     }
 
     @Test
-    void updatePerson() throws Exception{
+    void updatePerson() throws Exception {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword("passwmario");
@@ -123,8 +120,8 @@ public class PersonControllerIT {
         long counterBefore = personRepository.count();
 
         mockMvc.perform(put("/api/person/{id}", id).with(admin(1L))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
                                 {
                                     "firstName": "Anna",
                                     "lastName": "Verdi",
@@ -159,14 +156,14 @@ public class PersonControllerIT {
                         .with(admin(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {
-                              "firstName":"Anna",
-                              "lastName":"Verdi",
-                              "dateOfBirth":"1995-02-10",
-                              "username":"changed.username",
-                              "password":"Password123!"
-                            }
-                            """))
+                                {
+                                  "firstName":"Anna",
+                                  "lastName":"Verdi",
+                                  "dateOfBirth":"1995-02-10",
+                                  "username":"changed.username",
+                                  "password":"Password123!"
+                                }
+                                """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PERSON_DATA"));
         entityManager.clear();
@@ -177,7 +174,7 @@ public class PersonControllerIT {
     }
 
     @Test
-    void deletePerson() throws Exception{
+    void deletePerson() throws Exception {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword("passwmario");
@@ -193,7 +190,7 @@ public class PersonControllerIT {
         entityManager.clear();
 
         assertFalse(personRepository.existsById(id));
-        assertEquals(counterBefore -1 , personRepository.count());
+        assertEquals(counterBefore - 1, personRepository.count());
     }
 
     @ValueSource(strings = {"GET", "PUT", "DELETE"})
@@ -203,12 +200,12 @@ public class PersonControllerIT {
             case "PUT" -> put("/api/person/{id}", Long.MAX_VALUE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
-                        {
-                          "firstName":"Anna",
-                          "lastName":"Verdi",
-                          "dateOfBirth":"1995-02-10"
-                        }
-                        """);
+                            {
+                              "firstName":"Anna",
+                              "lastName":"Verdi",
+                              "dateOfBirth":"1995-02-10"
+                            }
+                            """);
             case "DELETE" -> delete("/api/person/{id}", Long.MAX_VALUE);
             default -> throw new IllegalArgumentException(method);
         };

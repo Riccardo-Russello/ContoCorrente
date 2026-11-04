@@ -1,6 +1,10 @@
 package it.russello.contocorrente.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import java.math.BigDecimal;
 
 public record TransferRequest(@NotNull(message = "Id conto destinatario obbligatorio")
@@ -14,4 +18,5 @@ public record TransferRequest(@NotNull(message = "Id conto destinatario obbligat
                               @Digits(
                                       integer = 13,
                                       fraction = 2,
-                                      message = "Importo con massimo 13 cifre intere e 2 decimali")BigDecimal amount){}
+                                      message = "Importo con massimo 13 cifre intere e 2 decimali") BigDecimal amount) {
+}

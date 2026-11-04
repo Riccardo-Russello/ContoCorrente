@@ -1,20 +1,20 @@
 package it.russello.contocorrente.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.service.PersonService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.validation.annotation.Validated;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import it.russello.contocorrente.dto.PageResponse;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Persone", description = "Gestione delle persone")
 @RestController
@@ -42,7 +42,7 @@ public class PersonController {
     @Operation(summary = "Restituisce il profilo dell'utente autenticato")
     @GetMapping("/my_profile")
     public ResponseEntity<PersonResponse> myProfile() {
-        return ResponseEntity.status(HttpStatus.OK).body(personService.findById());
+        return ResponseEntity.status(HttpStatus.OK).body(personService.myProfile());
     }
 
     @Operation(summary = "Aggiorna una persona")

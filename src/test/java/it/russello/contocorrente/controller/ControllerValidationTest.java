@@ -4,7 +4,10 @@ import it.russello.contocorrente.dto.LoginRequest;
 import it.russello.contocorrente.dto.LoginResponse;
 import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.exception.ApiExceptionHandler;
-import it.russello.contocorrente.service.*;
+import it.russello.contocorrente.service.AccountService;
+import it.russello.contocorrente.service.AuthService;
+import it.russello.contocorrente.service.PersonService;
+import it.russello.contocorrente.service.TransactionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -24,8 +27,10 @@ import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest({PersonController.class, AccountController.class, TransactionController.class, AuthController.class})
 @AutoConfigureMockMvc(addFilters = false)
@@ -42,16 +47,15 @@ public class ControllerValidationTest {
     @MockitoBean
     AuthService authService;
 
-    record InvalidRequest(String method, String url, String json, String code){}
-
-    private static String quote(String value){
-        if(value == null){
+    private static String quote(String value) {
+        if (value == null) {
             return "null";
         }
         return "\"" + value.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n") + "\"";
     }
+
     private static String person(String first, String last, String birth, String username, String password) {
         return """
                 {
@@ -63,6 +67,7 @@ public class ControllerValidationTest {
                 }
                 """.formatted(quote(first), quote(last), quote(birth), quote(username), quote(password));
     }
+
     static Stream<InvalidRequest> invalidRequests() {
         List<InvalidRequest> cases = new ArrayList<>();
         String birth = "1990-05-15";
@@ -79,7 +84,7 @@ public class ControllerValidationTest {
                         person("Mario", invalid, birth, username, password),
                         "INVALID_PERSON_DATA"));
             }
-            for (String invalid : new String[]{ null, LocalDate.now().plusDays(1).toString()}) {
+            for (String invalid : new String[]{null, LocalDate.now().plusDays(1).toString()}) {
                 cases.add(new InvalidRequest(method, url,
                         person("Mario", "Rossi", invalid, username, password), "INVALID_PERSON_DATA"));
             }
@@ -117,8 +122,8 @@ public class ControllerValidationTest {
         for (long personId : new long[]{0, -1}) {
             cases.add(new InvalidRequest("POST", "/api/account",
                     """
-                    {"personId":%d,"accountNumber":"ACC-001"}
-                    """.formatted(personId),
+                            {"personId":%d,"accountNumber":"ACC-001"}
+                            """.formatted(personId),
                     "INVALID_ACCOUNT_DATA"));
         }
 
@@ -131,16 +136,16 @@ public class ControllerValidationTest {
                 cases.add(new InvalidRequest(
                         "POST", "/api/account/1/transaction",
                         """
-                        {"amount":%s,"type":"%s","to":%s}
-                        """.formatted(amount, type, destination),
+                                {"amount":%s,"type":"%s","to":%s}
+                                """.formatted(amount, type, destination),
                         "INVALID_TRANSACTION_DATA"));
             }
 
             cases.add(new InvalidRequest(
                     "POST", "/api/account/1/transaction/transfer",
                     """
-                    {"destinationAccountId":2,"amount":%s}
-                    """.formatted(amount),
+                            {"destinationAccountId":2,"amount":%s}
+                            """.formatted(amount),
                     "INVALID_TRANSACTION_DATA"));
         }
 
@@ -154,15 +159,15 @@ public class ControllerValidationTest {
             cases.add(new InvalidRequest(
                     "POST", "/api/account/1/transaction",
                     """
-                    {"amount":10,"type":"TRANSFER","to":%s}
-                    """.formatted(destination),
+                            {"amount":10,"type":"TRANSFER","to":%s}
+                            """.formatted(destination),
                     "INVALID_TRANSACTION_DATA"));
 
             cases.add(new InvalidRequest(
                     "POST", "/api/account/1/transaction/transfer",
                     """
-                    {"amount":10,"destinationAccountId":%s}
-                    """.formatted(destination),
+                            {"amount":10,"destinationAccountId":%s}
+                            """.formatted(destination),
                     "INVALID_TRANSACTION_DATA"));
         }
 
@@ -170,8 +175,8 @@ public class ControllerValidationTest {
             cases.add(new InvalidRequest(
                     "POST", "/api/account/1/transaction",
                     """
-                    {"amount":10,"type":"%s","to":2}
-                    """.formatted(type),
+                            {"amount":10,"type":"%s","to":2}
+                            """.formatted(type),
                     "INVALID_TRANSACTION_DATA"));
         }
 
@@ -263,6 +268,9 @@ public class ControllerValidationTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         verifyNoInteractions(authService);
+    }
+
+    record InvalidRequest(String method, String url, String json, String code) {
     }
 }
 

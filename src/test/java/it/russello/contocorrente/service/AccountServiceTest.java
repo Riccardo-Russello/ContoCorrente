@@ -10,32 +10,25 @@ import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.repository.AccountRepository;
 import it.russello.contocorrente.repository.AccountTransactionRepository;
 import it.russello.contocorrente.repository.PersonRepository;
+import it.russello.contocorrente.security.AccountSecurity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
-import it.russello.contocorrente.security.AccountSecurity;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,23 +48,30 @@ public class AccountServiceTest {
     @InjectMocks
     private AccountService accountService;
 
-    private static Person person(){
+    private static Person person() {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
-        ReflectionTestUtils.setField(person,"id",10L);
+        ReflectionTestUtils.setField(person, "id", 10L);
         return person;
     }
-    private static Account account(Long id){
+
+    private static Account account(Long id) {
         Account account = new Account(person(), "ACC-001");
-        ReflectionTestUtils.setField(account,"id",id);
-        ReflectionTestUtils.setField(account,"openedAt",OPENED_AT);
+        ReflectionTestUtils.setField(account, "id", id);
+        ReflectionTestUtils.setField(account, "openedAt", OPENED_AT);
         return account;
     }
-    private static AccountCreateRequest validCreateRequest(){
+
+    private static AccountCreateRequest validCreateRequest() {
         return new AccountCreateRequest(10L, "ACC-001");
     }
 
+    private static void assertApiError(ApiException exception, HttpStatus status, String code) {
+        assertEquals(status, exception.getStatus());
+        assertEquals(code, exception.getCode());
+    }
+
     @Test
-    void createAccount(){
+    void createAccount() {
         Person owner = person();
         Account saved = account(1L);
 
@@ -97,7 +97,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void createWithoutPersonIdUsesCurrentPerson(){
+    void createWithoutPersonIdUsesCurrentPerson() {
         when(accountSecurity.currentPersonId()).thenReturn(10L);
         when(accountSecurity.isAdmin()).thenReturn(false);
         when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
@@ -109,7 +109,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void userCreateAccountForSelf(){
+    void userCreateAccountForSelf() {
         when(accountSecurity.currentPersonId()).thenReturn(10L);
         when(accountSecurity.isAdmin()).thenReturn(false);
         when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
@@ -120,7 +120,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void userCannotCreateAccountForAnotherPerson(){
+    void userCannotCreateAccountForAnotherPerson() {
         when(accountSecurity.currentPersonId()).thenReturn(10L);
         when(accountSecurity.isAdmin()).thenReturn(false);
         assertThrows(AccessDeniedException.class, () -> accountService.create(new AccountCreateRequest(20L, "ACC-OTHER")));
@@ -128,7 +128,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void adminCanCreateAccountForAnotherPerson(){
+    void adminCanCreateAccountForAnotherPerson() {
         Person other = person();
         ReflectionTestUtils.setField(other, "id", 20L);
         when(accountSecurity.currentPersonId()).thenReturn(10L);
@@ -140,7 +140,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void createMissingPerson(){
+    void createMissingPerson() {
         when(personRepository.findById(10L)).thenReturn(Optional.empty());
         when(accountSecurity.currentPersonId()).thenReturn(10L);
         when(accountSecurity.isAdmin()).thenReturn(true);
@@ -150,7 +150,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void createDuplicateAccountNumber(){
+    void createDuplicateAccountNumber() {
         when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
         when(accountRepository.existsByAccountNumber("ACC-001")).thenReturn(true);
         when(accountSecurity.currentPersonId()).thenReturn(10L);
@@ -162,7 +162,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void createAccountNumberWith30Characters(){
+    void createAccountNumberWith30Characters() {
         String number = "a".repeat(30);
         when(personRepository.findById(10L)).thenReturn(Optional.of(person()));
         when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -175,7 +175,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void findAllAccounts(){
+    void findAllAccounts() {
         Account first = account(1L);
         Account second = account(2L);
         second.setAccountNumber("ACC-002");
@@ -185,7 +185,7 @@ public class AccountServiceTest {
         when(accountRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
         Page<AccountResponse> responses = accountService.findAll(pageable);
         assertEquals(List.of(new AccountResponse(1L, 10L, "ACC-001", OPENED_AT, new BigDecimal("0.00")),
-                new AccountResponse(2L, 10L, "ACC-002", OPENED_AT, new BigDecimal("50.00"))),
+                        new AccountResponse(2L, 10L, "ACC-002", OPENED_AT, new BigDecimal("50.00"))),
                 responses.getContent());
         assertEquals(0, responses.getNumber());
         assertEquals(10, responses.getSize());
@@ -196,7 +196,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void userFindAllReturnOwnAccounts(){
+    void userFindAllReturnOwnAccounts() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
         Account ownAccount = account(1L);
         when(accountSecurity.isAdmin()).thenReturn(false);
@@ -211,7 +211,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void userWithoutAccountGetsEmptyList(){
+    void userWithoutAccountGetsEmptyList() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
         when(accountSecurity.isAdmin()).thenReturn(false);
         when(accountSecurity.currentPersonId()).thenReturn(10L);
@@ -225,7 +225,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void findById(){
+    void findById() {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(1L)));
         assertEquals(new AccountResponse(1L, 10L, "ACC-001", OPENED_AT, new BigDecimal("0.00")),
                 accountService.findById(1L));
@@ -233,7 +233,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void getBalanceAndCurrency(){
+    void getBalanceAndCurrency() {
         Account existing = account(1L);
         existing.setBalance(new BigDecimal("125.50"));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
@@ -243,7 +243,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void updateExistingAccount(){
+    void updateExistingAccount() {
         Account existing = account(1L);
         existing.setBalance(new BigDecimal("50.00"));
         Person originalOwner = existing.getPerson();
@@ -264,9 +264,8 @@ public class AccountServiceTest {
         verifyNoInteractions(personRepository, accountTransactionRepository);
     }
 
-
     @Test
-    void updateDuplicateAccountNumber(){
+    void updateDuplicateAccountNumber() {
         Account existing = account(1L);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(accountRepository.existsByAccountNumberAndIdNot("ACC-002", 1L)).thenReturn(true);
@@ -277,7 +276,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void updateAccountNumberWith30Characters(){
+    void updateAccountNumberWith30Characters() {
         String number = "a".repeat(30);
         Account existing = account(1L);
         existing.setAccountNumber(number);
@@ -291,7 +290,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void deleteValidAccount(){
+    void deleteValidAccount() {
         Account existing = account(1L);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(accountTransactionRepository.existsByAccount_Id(1L)).thenReturn(false);
@@ -306,7 +305,7 @@ public class AccountServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"10.00", "-10.00"})
-    void deleteAccountWithBalance(String balance){
+    void deleteAccountWithBalance(String balance) {
         Account existing = account(1L);
         existing.setBalance(new BigDecimal(balance));
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
@@ -318,7 +317,7 @@ public class AccountServiceTest {
     }
 
     @Test
-    void deleteAccountWithTransactions(){
+    void deleteAccountWithTransactions() {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(account(1L)));
         when(accountTransactionRepository.existsByAccount_Id(1L)).thenReturn(true);
         ApiException exception = assertThrows(ApiException.class, () -> accountService.delete(1L));
@@ -329,10 +328,10 @@ public class AccountServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"findById", "getBalance", "update", "delete"})
-    void operationsMissingAccount(String operation){
+    void operationsMissingAccount(String operation) {
         when(accountRepository.findById(1L)).thenReturn(Optional.empty());
         ApiException exception = assertThrows(ApiException.class, () -> {
-            switch(operation){
+            switch (operation) {
                 case "findById" -> accountService.findById(1L);
                 case "getBalance" -> accountService.getBalance(1L);
                 case "update" -> accountService.update(1L, new AccountUpdateRequest("ACC-002"));
@@ -344,11 +343,5 @@ public class AccountServiceTest {
         verify(accountRepository).findById(1L);
         verifyNoMoreInteractions(accountRepository);
         verifyNoInteractions(personRepository, accountTransactionRepository);
-    }
-
-
-    private static void assertApiError(ApiException exception, HttpStatus status, String code){
-        assertEquals(status, exception.getStatus());
-        assertEquals(code, exception.getCode());
     }
 }

@@ -9,21 +9,23 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -40,21 +42,22 @@ public class AuthControllerIT {
     @Autowired
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
-    private void savePerson(){
+    private void savePerson() {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword(passwordEncoder.encode("passwmario"));
         personRepository.saveAndFlush(person);
     }
-    private String loginAndGetToken() throws Exception{
+
+    private String loginAndGetToken() throws Exception {
         String response = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                            "username" : "mario.rossi",
-                            "password" : "passwmario"
-                        }
-                        """))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "username" : "mario.rossi",
+                                    "password" : "passwmario"
+                                }
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -64,7 +67,7 @@ public class AuthControllerIT {
     }
 
     @Test
-    void registrationPublicAndStoresCryptedPassword() throws Exception{
+    void registrationPublicAndStoresCryptedPassword() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -84,7 +87,7 @@ public class AuthControllerIT {
     }
 
     @Test
-    void loginReturnsUsableToken() throws Exception{
+    void loginReturnsUsableToken() throws Exception {
         savePerson();
         String token = loginAndGetToken();
         mockMvc.perform(get("/api/account").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -113,11 +116,11 @@ public class AuthControllerIT {
     }
 
     @Test
-    void wrongPasswordReturnUnauthorized() throws Exception{
+    void wrongPasswordReturnUnauthorized() throws Exception {
         savePerson();
         mockMvc.perform(post("/api/auth/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
                                 {
                                     "username": "mario.rossi",
                                     "password": "WrongPassword!"
@@ -162,7 +165,7 @@ public class AuthControllerIT {
     }
 
     @Test
-    void unknownUsernameReturnsUnauthorized() throws Exception{
+    void unknownUsernameReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -175,7 +178,7 @@ public class AuthControllerIT {
     }
 
     @Test
-    void missingCredentialsReturnsBadRequest() throws Exception{
+    void missingCredentialsReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -184,20 +187,20 @@ public class AuthControllerIT {
     }
 
     @Test
-    void protectedEndpointWithoutTokenReturnsUnauthorized() throws Exception{
+    void protectedEndpointWithoutTokenReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/account"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void invalidTokenReturnsUnauthorized() throws Exception{
+    void invalidTokenReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/account")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void expiresTokenReturnsUnauthorized() throws Exception{
+    void expiresTokenReturnsUnauthorized() throws Exception {
         Instant now = Instant.now();
         var claims = JwtClaimsSet.builder()
                 .issuer("contocorrente")
@@ -208,12 +211,12 @@ public class AuthControllerIT {
         var header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         mockMvc.perform(get("/api/account")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void duplicateUsernameReturnsConflict() throws Exception{
+    void duplicateUsernameReturnsConflict() throws Exception {
         savePerson();
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)

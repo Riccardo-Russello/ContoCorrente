@@ -6,14 +6,14 @@ import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.repository.AccountRepository;
 import it.russello.contocorrente.repository.PersonRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.access.prepost.PreAuthorize;
 import it.russello.contocorrente.security.AccountSecurity;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -26,8 +26,8 @@ public class PersonService {
 
     @PreAuthorize("isAnonymous() or hasRole('admin')")
     public PersonResponse create(PersonRequest request) {
-        if(personRepository.existsByUsername(request.username())) {
-            throw  new ApiException(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "Username già utilizzato");
+        if (personRepository.existsByUsername(request.username())) {
+            throw new ApiException(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "Username già utilizzato");
         }
         Person person = new Person(request.firstName(), request.lastName(), request.dateOfBirth());
         person.setUsername(request.username());
@@ -49,7 +49,7 @@ public class PersonService {
     }
 
     @PreAuthorize("hasAnyRole('admin', 'user')")
-    public PersonResponse findById(){
+    public PersonResponse myProfile() {
         Long personId = accountSecurity.currentPersonId();
         return PersonResponse.from(requirePerson(personId));
     }

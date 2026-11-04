@@ -7,17 +7,16 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -28,7 +27,7 @@ import java.util.Base64;
 public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return  new BCryptPasswordEncoder(12);
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean
@@ -41,12 +40,12 @@ public class SecurityConfig {
 
     @Bean
     public SecretKey jwtSecretKey(
-            @Value("${security.jwt.secret}")String secret) {
+            @Value("${security.jwt.secret}") String secret) {
         byte[] bytes = Base64.getDecoder().decode(secret);
-        if(bytes.length < 32) {
+        if (bytes.length < 32) {
             throw new IllegalArgumentException("La chiave deve essere di almeno 32 byte");
         }
-        return new SecretKeySpec(bytes,"HmacSHA256");
+        return new SecretKeySpec(bytes, "HmacSHA256");
     }
 
     @Bean
@@ -55,7 +54,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(SecretKey jwtSecretKey, @Value("${security.jwt.issuer}")String issuer){
+    public JwtDecoder jwtDecoder(SecretKey jwtSecretKey, @Value("${security.jwt.issuer}") String issuer) {
         var decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
@@ -79,14 +78,14 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.POST,
-                        "/api/auth/login", "/api/auth/signup")
+                                "/api/auth/login", "/api/auth/signup")
                         .permitAll()
                         .requestMatchers("/swagger-ui/**",
                                 "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**")
                         .permitAll()
                         .anyRequest().authenticated())
-                        .oauth2ResourceServer(resourceServer ->
-                                resourceServer.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                .oauth2ResourceServer(resourceServer ->
+                        resourceServer.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
     }
 }

@@ -2,29 +2,28 @@ package it.russello.contocorrente.controller;
 
 import com.jayway.jsonpath.JsonPath;
 import it.russello.contocorrente.entity.Account;
+import it.russello.contocorrente.entity.AccountTransaction;
 import it.russello.contocorrente.entity.Person;
+import it.russello.contocorrente.entity.TransactionType;
 import it.russello.contocorrente.repository.AccountRepository;
+import it.russello.contocorrente.repository.AccountTransactionRepository;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static it.russello.contocorrente.support.TestJwt.admin;
-import it.russello.contocorrente.entity.AccountTransaction;
-import it.russello.contocorrente.entity.TransactionType;
-import it.russello.contocorrente.repository.AccountTransactionRepository;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -45,8 +44,9 @@ public class AccountControllerIT {
     private AccountTransactionRepository transactionRepository;
 
     private Person person;
+
     @BeforeEach
-    void setUp(){
+    void setUp() {
         person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
         person.setUsername("mario.rossi");
         person.setPassword("passwmario");
@@ -57,13 +57,13 @@ public class AccountControllerIT {
     void createAccount() throws Exception {
         long counterBefore = accountRepository.count();
         var response = mockMvc.perform(post("/api/account").with(admin(person.getId()))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                            {
-                                "personId" : %d,
-                                "accountNumber" : "ACC-001"
-                            }
-                            """.formatted(person.getId())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "personId" : %d,
+                                    "accountNumber" : "ACC-001"
+                                }
+                                """.formatted(person.getId())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.personId").value(person.getId()))
@@ -90,11 +90,11 @@ public class AccountControllerIT {
                         .with(admin(person.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {
-                              "personId":%d,
-                              "accountNumber":"MISSING-PERSON"
-                            }
-                            """.formatted(Long.MAX_VALUE)))
+                                {
+                                  "personId":%d,
+                                  "accountNumber":"MISSING-PERSON"
+                                }
+                                """.formatted(Long.MAX_VALUE)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
         assertEquals(before, accountRepository.count());
@@ -114,8 +114,8 @@ public class AccountControllerIT {
                         .with(admin(person.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {"accountNumber":"TAKEN"}
-                            """))
+                                {"accountNumber":"TAKEN"}
+                                """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code")
                         .value("ACCOUNT_NUMBER_ALREADY_EXISTS"));
@@ -127,7 +127,7 @@ public class AccountControllerIT {
     }
 
     @Test
-    void findAllAccounts()  throws Exception {
+    void findAllAccounts() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         entityManager.clear();
         mockMvc.perform(get("/api/account").with(admin(person.getId())))
@@ -200,14 +200,14 @@ public class AccountControllerIT {
     }
 
     @Test
-    void updateAccount() throws Exception{
+    void updateAccount() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         Long id = account.getId();
         long counterBefore = accountRepository.count();
         entityManager.clear();
         mockMvc.perform(put("/api/account/{id}", id).with(admin(person.getId()))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
                                 {
                                     "accountNumber": "ACC-002"
                                 }
@@ -239,7 +239,7 @@ public class AccountControllerIT {
         entityManager.flush();
         entityManager.clear();
         assertFalse(accountRepository.existsById(id));
-        assertEquals(counterBefore -1 , accountRepository.count() );
+        assertEquals(counterBefore - 1, accountRepository.count());
         assertTrue(personRepository.existsById(person.getId()));
     }
 
@@ -252,8 +252,8 @@ public class AccountControllerIT {
             case "PUT" -> put("/api/account/{id}", Long.MAX_VALUE)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
-                        {"accountNumber":"UPDATED"}
-                        """);
+                            {"accountNumber":"UPDATED"}
+                            """);
             case "DELETE" -> delete("/api/account/{id}", Long.MAX_VALUE);
             default -> throw new IllegalArgumentException(operation);
         };

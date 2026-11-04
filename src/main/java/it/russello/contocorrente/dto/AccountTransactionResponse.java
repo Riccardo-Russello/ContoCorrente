@@ -24,7 +24,7 @@ public record AccountTransactionResponse(Long id,
                 balance,
                 transaction.getAccount().getId(),
                 transaction.getDestinationAccount() == null ?
-                    null : transaction.getDestinationAccount().getId(),
+                        null : transaction.getDestinationAccount().getId(),
                 destinationBalance);
     }
 

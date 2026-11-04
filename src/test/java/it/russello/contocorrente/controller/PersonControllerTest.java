@@ -4,22 +4,18 @@ import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.exception.ApiExceptionHandler;
+import it.russello.contocorrente.service.AuthService;
 import it.russello.contocorrente.service.PersonService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import it.russello.contocorrente.service.AuthService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -29,18 +25,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 
-
 @WebMvcTest({PersonController.class, AuthController.class})
 @AutoConfigureMockMvc(addFilters = false)
 @Import(ApiExceptionHandler.class)
 public class PersonControllerTest {
-    @Autowired
-    private MockMvc mockMvc;
-    @MockitoBean
-    private PersonService personService;
-    @MockitoBean
-    private AuthService authService;
-
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 5, 15);
     private static final String VALID_JSON = """
             {
@@ -51,19 +39,28 @@ public class PersonControllerTest {
                 "password" : "passwmario"
             }
             """;
-    private static PersonRequest request(){
+    private static final String UPDATE_JSON = """
+            {
+                "firstName": "Mario",
+                "lastName": "Rossi",
+                "dateOfBirth": "1990-05-15"
+            }
+            """;
+    @Autowired
+    private MockMvc mockMvc;
+    @MockitoBean
+    private PersonService personService;
+    @MockitoBean
+    private AuthService authService;
+
+    private static PersonRequest request() {
         return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
     }
-    private static PersonResponse response(){
+
+    private static PersonResponse response() {
         return new PersonResponse(1L, "Mario", "Rossi", BIRTH_DATE);
     }
-    private static final String UPDATE_JSON = """
-        {
-            "firstName": "Mario",
-            "lastName": "Rossi",
-            "dateOfBirth": "1990-05-15"
-        }
-        """;
+
     private static PersonRequest updateRequest() {
         return new PersonRequest("Mario", "Rossi", BIRTH_DATE, null, null);
     }
@@ -72,8 +69,8 @@ public class PersonControllerTest {
     void createValidPerson() throws Exception {
         when(personService.create(request())).thenReturn(response());
         mockMvc.perform(post("/api/auth/signup")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(VALID_JSON))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
@@ -134,9 +131,9 @@ public class PersonControllerTest {
         Pageable pageable = PageRequest.of(1, 1, Sort.by(Sort.Direction.DESC, "lastName"));
         when(personService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response()), pageable, 3));
         mockMvc.perform(get("/api/person")
-                    .param("page", "1")
-                    .param("size", "1")
-                    .param("sort", "lastName,desc"))
+                        .param("page", "1")
+                        .param("size", "1")
+                        .param("sort", "lastName,desc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.page").value(1))
@@ -172,8 +169,8 @@ public class PersonControllerTest {
     void updatePerson() throws Exception {
         when(personService.update(1L, updateRequest())).thenReturn(response());
         mockMvc.perform(put("/api/person/1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(UPDATE_JSON))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(UPDATE_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
@@ -186,8 +183,8 @@ public class PersonControllerTest {
     void updatePersonNotFound() throws Exception {
         when(personService.update(1L, updateRequest())).thenThrow(new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Person non trovata"));
         mockMvc.perform(put("/api/person/1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(UPDATE_JSON))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(UPDATE_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
         verify(personService).update(1L, updateRequest());
@@ -225,8 +222,8 @@ public class PersonControllerTest {
     @Test
     void createRejectJsonMalformed() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         verifyNoInteractions(personService);
@@ -235,14 +232,14 @@ public class PersonControllerTest {
     @Test
     void createInvalidDateFormat() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                            "firstName": "Mario",
-                            "lastName": "Rossi",
-                            "dateOfBirth": "non-una-data"
-                        }
-                        """))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "firstName": "Mario",
+                                    "lastName": "Rossi",
+                                    "dateOfBirth": "non-una-data"
+                                }
+                                """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         verifyNoInteractions(personService);
