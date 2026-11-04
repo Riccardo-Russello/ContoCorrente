@@ -26,8 +26,8 @@ import java.util.Base64;
 @EnableMethodSecurity
 public class SecurityConfig {
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+    public PasswordEncoder passwordEncoder(@Value("${security.password.bcrypt-strength:12}") int strength) {
+        return new BCryptPasswordEncoder(strength);
     }
 
     @Bean
