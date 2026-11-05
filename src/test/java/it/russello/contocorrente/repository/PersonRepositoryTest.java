@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@DataJpaTest(properties ={
+@DataJpaTest(properties = {
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
@@ -22,8 +22,10 @@ class PersonRepositoryTest {
     private EntityManager entityManager;
 
     @Test
-    void saveReadPersonFromDatabase(){
+    void saveReadPersonFromDatabase() {
         Person person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
         Person saved = personRepository.saveAndFlush(person);
         Long id = saved.getId();
         assertNotNull(id);
@@ -32,9 +34,11 @@ class PersonRepositoryTest {
         Person found = personRepository.findById(id).orElseThrow();
 
         assertEquals(id, found.getId());
-        assertEquals("Mario",  found.getFirstName());
+        assertEquals("Mario", found.getFirstName());
         assertEquals("Rossi", found.getLastName());
         assertEquals(LocalDate.of(1990, 5, 15), found.getDateOfBirth());
+        assertEquals("mario.rossi", found.getUsername());
+        assertEquals("passwmario", found.getPassword());
 
     }
 }

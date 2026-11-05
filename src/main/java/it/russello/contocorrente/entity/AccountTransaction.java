@@ -10,7 +10,8 @@ import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "accounttransaction")
-@Getter @NoArgsConstructor
+@Getter
+@NoArgsConstructor
 public class AccountTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,7 +27,7 @@ public class AccountTransaction {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "destinationAccountId", updatable = false,
-                foreignKey = @ForeignKey(name = "fk_transaction_destination"))
+            foreignKey = @ForeignKey(name = "fk_transaction_destination"))
     private Account destinationAccount;
 
     @Enumerated(EnumType.STRING)

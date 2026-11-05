@@ -10,6 +10,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -22,10 +23,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TransactionController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(ApiExceptionHandler.class)
 public class TransactionControllerTest {
     private static final String BASE_URL = "/api/account/1/transaction";
@@ -46,9 +49,11 @@ public class TransactionControllerTest {
     private MockMvc mockMvc;
     @MockitoBean
     private TransactionService transactionService;
+
     private static AccountTransactionRequest transactionRequest() {
         return new AccountTransactionRequest(new BigDecimal("25.00"), TransactionType.DEPOSIT, null);
     }
+
     private static TransferRequest transferRequest() {
         return new TransferRequest(2L, new BigDecimal("25.00"));
     }
@@ -57,7 +62,7 @@ public class TransactionControllerTest {
     @ValueSource(strings = {"DEPOSIT", "WITHDRAWAL", "TRANSFER"})
     void createTransaction(String typeName) throws Exception {
         TransactionType type = TransactionType.valueOf(typeName);
-        boolean transfer = type == TransactionType.TRANSFER ;
+        boolean transfer = type == TransactionType.TRANSFER;
         Long destination = transfer ? 2L : null;
         BigDecimal balance = new BigDecimal(type == TransactionType.DEPOSIT ? "125.00" : "75.00");
         BigDecimal destinationBalance = transfer ? new BigDecimal("75.00") : null;
@@ -79,10 +84,10 @@ public class TransactionControllerTest {
                 .andExpect(jsonPath("$.occurredAt").value("2026-01-10T12:00:00"))
                 .andExpect(jsonPath("$.balance").value(balance.doubleValue()))
                 .andExpect(jsonPath("$.sourceAccountId").value(1));
-        if(transfer){
+        if (transfer) {
             result.andExpect(jsonPath("$.destinationAccountId").value(2))
                     .andExpect(jsonPath("$.destinationBalance").value(75.00));
-        }else{
+        } else {
             result.andExpect(jsonPath("$.destinationAccountId").doesNotExist())
                     .andExpect(jsonPath("$.destinationBalance").doesNotExist());
         }
@@ -97,7 +102,7 @@ public class TransactionControllerTest {
                         new BigDecimal("75.00"), 1L, 2L,
                         new BigDecimal("75.00")));
         mockMvc.perform(post(BASE_URL + "/transfer")
-                            .contentType(MediaType.APPLICATION_JSON).content(TRANSFER_JSON))
+                        .contentType(MediaType.APPLICATION_JSON).content(TRANSFER_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(100))
                 .andExpect(jsonPath("$.type").value("TRANSFER"))
@@ -114,7 +119,7 @@ public class TransactionControllerTest {
     void getLastFiveTransactions() throws Exception {
         when(transactionService.getLastFiveTransactions(1L))
                 .thenReturn(List.of(new TransactionListResponse(101L, TransactionType.TRANSFER, new BigDecimal("25.00"), OCCURRED_AT, 1L, 2L),
-                                    new TransactionListResponse(100L, TransactionType.DEPOSIT, new BigDecimal("10.00"), OCCURRED_AT, 1L, null)));
+                        new TransactionListResponse(100L, TransactionType.DEPOSIT, new BigDecimal("10.00"), OCCURRED_AT, 1L, null)));
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
@@ -173,7 +178,7 @@ public class TransactionControllerTest {
     @Test
     void getTransactionMissingAccount() throws Exception {
         when(transactionService.getLastFiveTransactions(1L))
-                .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND","Conto non trovato"));
+                .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "Conto non trovato"));
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"))
@@ -189,6 +194,7 @@ public class TransactionControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         verifyNoInteractions(transactionService);
     }
+
     @ParameterizedTest
     @ValueSource(strings = {"", "/transfer"})
     void rejectsMissingBody(String suffix) throws Exception {
@@ -200,9 +206,9 @@ public class TransactionControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"{\"amount\":25.00,\"type\":\"UNKNOWN\"}",
-                            "{\"amount\":\"abc\",\"type\":\"DEPOSIT\"}",
-                            "{\"amount\":25.00,\"type\":\"TRANSFER\",\"to\":\"abc\"}"})
-    void invalidTransactionJson(String json)  throws Exception {
+            "{\"amount\":\"abc\",\"type\":\"DEPOSIT\"}",
+            "{\"amount\":25.00,\"type\":\"TRANSFER\",\"to\":\"abc\"}"})
+    void invalidTransactionJson(String json) throws Exception {
         mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -212,12 +218,12 @@ public class TransactionControllerTest {
     @Test
     void rejectsNonNumericTransferDestination() throws Exception {
         mockMvc.perform(post(BASE_URL + "/transfer").contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                         {
-                            "destinationAccountId": "abc",
-                            "amount": 25.00
-                         }
-                         """))
+                        .content("""
+                                {
+                                   "destinationAccountId": "abc",
+                                   "amount": 25.00
+                                }
+                                """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         verifyNoInteractions(transactionService);
@@ -227,7 +233,7 @@ public class TransactionControllerTest {
     @ValueSource(strings = {"GET", "POST", "TRANSFER"})
     void rejectsNonNumericAccountId(String operation) throws Exception {
         String url = "/api/account/abc/transaction";
-        var request = switch(operation){
+        var request = switch (operation) {
             case "GET" -> get(url);
             case "POST" -> post(url)
                     .contentType(MediaType.APPLICATION_JSON)

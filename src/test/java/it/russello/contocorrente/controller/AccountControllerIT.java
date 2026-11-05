@@ -2,12 +2,17 @@ package it.russello.contocorrente.controller;
 
 import com.jayway.jsonpath.JsonPath;
 import it.russello.contocorrente.entity.Account;
+import it.russello.contocorrente.entity.AccountTransaction;
 import it.russello.contocorrente.entity.Person;
+import it.russello.contocorrente.entity.TransactionType;
 import it.russello.contocorrente.repository.AccountRepository;
+import it.russello.contocorrente.repository.AccountTransactionRepository;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -18,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -34,25 +40,30 @@ public class AccountControllerIT {
     private PersonRepository personRepository;
     @Autowired
     private EntityManager entityManager;
+    @Autowired
+    private AccountTransactionRepository transactionRepository;
 
     private Person person;
+
     @BeforeEach
-    void setUp(){
-        person =personRepository.saveAndFlush(
-                new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15)));
+    void setUp() {
+        person = new Person("Mario", "Rossi", LocalDate.of(1990, 5, 15));
+        person.setUsername("mario.rossi");
+        person.setPassword("passwmario");
+        personRepository.saveAndFlush(person);
     }
 
     @Test
     void createAccount() throws Exception {
         long counterBefore = accountRepository.count();
-        var response = mockMvc.perform(post("/api/account")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                            {
-                                "personId" : %d,
-                                "accountNumber" : "ACC-001"
-                            }
-                            """.formatted(person.getId())))
+        var response = mockMvc.perform(post("/api/account").with(admin(person.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "personId" : %d,
+                                    "accountNumber" : "ACC-001"
+                                }
+                                """.formatted(person.getId())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.personId").value(person.getId()))
@@ -73,24 +84,100 @@ public class AccountControllerIT {
     }
 
     @Test
-    void findAllAccounts()  throws Exception {
+    void createAccountForMissingPerson() throws Exception {
+        long before = accountRepository.count();
+        mockMvc.perform(post("/api/account")
+                        .with(admin(person.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "personId":%d,
+                                  "accountNumber":"MISSING-PERSON"
+                                }
+                                """.formatted(Long.MAX_VALUE)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
+        assertEquals(before, accountRepository.count());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"POST", "PUT"})
+    void duplicateAccountNumberIsRejected(String method) throws Exception {
+        accountRepository.saveAndFlush(new Account(person, "TAKEN"));
+        Account editable = accountRepository.saveAndFlush(
+                new Account(person, "ORIGINAL"));
+        long before = accountRepository.count();
+        var request = method.equals("POST")
+                ? post("/api/account")
+                : put("/api/account/{id}", editable.getId());
+        mockMvc.perform(request
+                        .with(admin(person.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"accountNumber":"TAKEN"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code")
+                        .value("ACCOUNT_NUMBER_ALREADY_EXISTS"));
+        entityManager.clear();
+        assertEquals(before, accountRepository.count());
+        assertEquals("ORIGINAL",
+                accountRepository.findById(editable.getId())
+                        .orElseThrow().getAccountNumber());
+    }
+
+    @Test
+    void findAllAccounts() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         entityManager.clear();
-        mockMvc.perform(get("/api/account"))
+        mockMvc.perform(get("/api/account").with(admin(person.getId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(account.getId()))
-                .andExpect(jsonPath("$[0].personId").value(person.getId()))
-                .andExpect(jsonPath("$[0].accountNumber").value("ACC-001"))
-                .andExpect(jsonPath("$[0].openedAt").isNotEmpty())
-                .andExpect(jsonPath("$[0].balance").value(0.0));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(account.getId()))
+                .andExpect(jsonPath("$.content[0].personId").value(person.getId()))
+                .andExpect(jsonPath("$.content[0].accountNumber").value("ACC-001"))
+                .andExpect(jsonPath("$.content[0].openedAt").isNotEmpty())
+                .andExpect(jsonPath("$.content[0].balance").value(0.0))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+    }
+
+    @Test
+    void findAllPaginatesAndSortsAccounts() throws Exception {
+        accountRepository.saveAndFlush(new Account(person, "ACC-001"));
+        accountRepository.saveAndFlush(new Account(person, "ACC-002"));
+        accountRepository.saveAndFlush(new Account(person, "ACC-003"));
+        entityManager.clear();
+        mockMvc.perform(get("/api/account")
+                        .with(admin(person.getId()))
+                        .param("page", "1")
+                        .param("size", "1")
+                        .param("sort", "accountNumber,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].accountNumber").value("ACC-002"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        mockMvc.perform(get("/api/account")
+                        .with(admin(person.getId()))
+                        .param("page", "3")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(3))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
     }
 
     @Test
     void findAccountById() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         entityManager.clear();
-        mockMvc.perform(get("/api/account/{id}", account.getId()))
+        mockMvc.perform(get("/api/account/{id}", account.getId()).with(admin(person.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(account.getId()))
                 .andExpect(jsonPath("$.personId").value(person.getId()))
@@ -105,7 +192,7 @@ public class AccountControllerIT {
         account.setBalance(new BigDecimal("125.50"));
         accountRepository.saveAndFlush(account);
         entityManager.clear();
-        mockMvc.perform(get("/api/account/{id}/balance", account.getId()))
+        mockMvc.perform(get("/api/account/{id}/balance", account.getId()).with(admin(person.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountId").value(account.getId()))
                 .andExpect(jsonPath("$.balance").value(125.50))
@@ -113,14 +200,14 @@ public class AccountControllerIT {
     }
 
     @Test
-    void updateAccount() throws Exception{
+    void updateAccount() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account(person, "ACC-001"));
         Long id = account.getId();
         long counterBefore = accountRepository.count();
         entityManager.clear();
-        mockMvc.perform(put("/api/account/{id}", id)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
+        mockMvc.perform(put("/api/account/{id}", id).with(admin(person.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
                                 {
                                     "accountNumber": "ACC-002"
                                 }
@@ -146,13 +233,68 @@ public class AccountControllerIT {
         Long id = account.getId();
         long counterBefore = accountRepository.count();
         entityManager.clear();
-        mockMvc.perform(delete("/api/account/{id}", id))
+        mockMvc.perform(delete("/api/account/{id}", id).with(admin(person.getId())))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
         entityManager.flush();
         entityManager.clear();
         assertFalse(accountRepository.existsById(id));
-        assertEquals(counterBefore -1 , accountRepository.count() );
+        assertEquals(counterBefore - 1, accountRepository.count());
         assertTrue(personRepository.existsById(person.getId()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"GET", "BALANCE", "PUT", "DELETE"})
+    void missingAccountReturnsNotFound(String operation) throws Exception {
+        var request = switch (operation) {
+            case "GET" -> get("/api/account/{id}", Long.MAX_VALUE);
+            case "BALANCE" -> get("/api/account/{id}/balance", Long.MAX_VALUE);
+            case "PUT" -> put("/api/account/{id}", Long.MAX_VALUE)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {"accountNumber":"UPDATED"}
+                            """);
+            case "DELETE" -> delete("/api/account/{id}", Long.MAX_VALUE);
+            default -> throw new IllegalArgumentException(operation);
+        };
+        long before = accountRepository.count();
+        mockMvc.perform(request.with(admin(person.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
+        assertEquals(before, accountRepository.count());
+    }
+
+    @Test
+    void accountWithBalanceCannotBeDeleted() throws Exception {
+        Account account = new Account(person, "NONZERO");
+        account.setBalance(new BigDecimal("10.00"));
+        accountRepository.saveAndFlush(account);
+        mockMvc.perform(delete("/api/account/{id}", account.getId())
+                        .with(admin(person.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_BALANCE_NOT_ZERO"));
+        entityManager.clear();
+        Account unchanged = accountRepository.findById(account.getId()).orElseThrow();
+        assertEquals(0, new BigDecimal("10.00").compareTo(unchanged.getBalance()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void accountWithTransactionsCannotBeDeleted(boolean incoming) throws Exception {
+        Account account = accountRepository.saveAndFlush(new Account(person, "WITH-MOVEMENTS"));
+        Account other = accountRepository.saveAndFlush(new Account(person, "OTHER-ACCOUNT"));
+        AccountTransaction transaction = incoming
+                ? new AccountTransaction(other, account, new BigDecimal("1.00"))
+                : new AccountTransaction(
+                account, TransactionType.DEPOSIT, new BigDecimal("1.00"));
+        transactionRepository.saveAndFlush(transaction);
+        long before = transactionRepository.count();
+        mockMvc.perform(delete("/api/account/{id}", account.getId())
+                        .with(admin(person.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_HAS_TRANSACTION"));
+        entityManager.clear();
+        assertTrue(accountRepository.existsById(account.getId()));
+        assertEquals(before, transactionRepository.count());
     }
 }

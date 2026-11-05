@@ -4,11 +4,14 @@ import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.exception.ApiExceptionHandler;
+import it.russello.contocorrente.service.AuthService;
 import it.russello.contocorrente.service.PersonService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -22,35 +25,52 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 
-
-@WebMvcTest(PersonController.class)
+@WebMvcTest({PersonController.class, AuthController.class})
+@AutoConfigureMockMvc(addFilters = false)
+@Import(ApiExceptionHandler.class)
 public class PersonControllerTest {
-    @Autowired
-    private MockMvc mockMvc;
-    @MockitoBean
-    private PersonService personService;
-
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 5, 15);
     private static final String VALID_JSON = """
             {
                 "firstName" : "Mario",
                 "lastName" : "Rossi",
-                "dateOfBirth" : "1990-05-15"
+                "dateOfBirth" : "1990-05-15",
+                "username" : "mario.rossi",
+                "password" : "passwmario"
             }
             """;
-    private static PersonRequest request(){
-        return new PersonRequest("Mario", "Rossi", BIRTH_DATE);
+    private static final String UPDATE_JSON = """
+            {
+                "firstName": "Mario",
+                "lastName": "Rossi",
+                "dateOfBirth": "1990-05-15"
+            }
+            """;
+    @Autowired
+    private MockMvc mockMvc;
+    @MockitoBean
+    private PersonService personService;
+    @MockitoBean
+    private AuthService authService;
+
+    private static PersonRequest request() {
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
     }
-    private static PersonResponse response(){
+
+    private static PersonResponse response() {
         return new PersonResponse(1L, "Mario", "Rossi", BIRTH_DATE);
+    }
+
+    private static PersonRequest updateRequest() {
+        return new PersonRequest("Mario", "Rossi", BIRTH_DATE, null, null);
     }
 
     @Test
     void createValidPerson() throws Exception {
         when(personService.create(request())).thenReturn(response());
-        mockMvc.perform(post("/api/person")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(VALID_JSON))
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
@@ -60,27 +80,68 @@ public class PersonControllerTest {
     }
 
     @Test
-    void findAllReturnPerson() throws Exception {
-        when(personService.findAll()).thenReturn(List.of(response()));
-        mockMvc.perform(get("/api/person"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].firstName").value("Mario"))
-                .andExpect(jsonPath("$[0].lastName").value("Rossi"))
-                .andExpect(jsonPath("$[0].dateOfBirth").value("1990-05-15"));
-        verify(personService).findAll();
+    void createDuplicateUsername() throws Exception {
+        when(personService.create(request()))
+                .thenThrow(new ApiException(
+                        HttpStatus.CONFLICT,
+                        "USERNAME_ALREADY_EXISTS",
+                        "Username già utilizzato"));
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("USERNAME_ALREADY_EXISTS"));
+        verify(personService).create(request());
     }
 
     @Test
-    void findByIdReturnEmptyList() throws Exception {
-        when(personService.findAll()).thenReturn(List.of());
+    void findAllReturnPerson() throws Exception {
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(personService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response()), pageable, 1));
         mockMvc.perform(get("/api/person"))
                 .andExpect(status().isOk())
-                .andExpect(content().json("[]"));
-        verify(personService).findAll();
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].firstName").value("Mario"))
+                .andExpect(jsonPath("$.content[0].lastName").value("Rossi"))
+                .andExpect(jsonPath("$.content[0].dateOfBirth").value("1990-05-15"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+        verify(personService).findAll(pageable);
     }
 
+    @Test
+    void findAllReturnsEmptyList() throws Exception {
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("id"));
+        when(personService.findAll(pageable)).thenReturn(Page.empty(pageable));
+        mockMvc.perform(get("/api/person"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+        verify(personService).findAll(pageable);
+    }
+
+    @Test
+    void findAllUsesRequestedPaginationAndSorts() throws Exception {
+        Pageable pageable = PageRequest.of(1, 1, Sort.by(Sort.Direction.DESC, "lastName"));
+        when(personService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(response()), pageable, 3));
+        mockMvc.perform(get("/api/person")
+                        .param("page", "1")
+                        .param("size", "1")
+                        .param("sort", "lastName,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        verify(personService).findAll(pageable);
+    }
 
     @Test
     void findById() throws Exception {
@@ -106,65 +167,27 @@ public class PersonControllerTest {
 
     @Test
     void updatePerson() throws Exception {
-        when(personService.update(1L, request())).thenReturn(response());
+        when(personService.update(1L, updateRequest())).thenReturn(response());
         mockMvc.perform(put("/api/person/1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(VALID_JSON)).andExpect(status().isOk())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(UPDATE_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.firstName").value("Mario"))
                 .andExpect(jsonPath("$.lastName").value("Rossi"))
                 .andExpect(jsonPath("$.dateOfBirth").value("1990-05-15"));
-        verify(personService).update(1L, request());
+        verify(personService).update(1L, updateRequest());
     }
 
     @Test
     void updatePersonNotFound() throws Exception {
-        when(personService.update(1L, request())).thenThrow(new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Person non trovata"));
-        mockMvc.perform(put("/api/person/1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(VALID_JSON))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
-        verify(personService).update(1L, request());
-    }
-
-    @Test
-    void createBadRequestInvalidData() throws Exception {
-        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE);
-        when(personService.create(invalid)).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA", "Nome obbligatorio"));
-        mockMvc.perform(post("/api/person")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                            "firstName" : "",
-                            "lastName" : "Rossi",
-                            "dateOfBirth" : "1990-05-15"
-                        }
-                        """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PERSON_DATA"))
-                .andExpect(jsonPath("$.message").value("Nome obbligatorio"));
-        verify(personService).create(invalid);
-    }
-
-    @Test
-    void updateBadRequestInvalidData() throws Exception {
-        PersonRequest invalid = new PersonRequest("", "Rossi", BIRTH_DATE);
-        when(personService.update(1L, invalid)).thenThrow(new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PERSON_DATA", "Nome obbligatorio"));
+        when(personService.update(1L, updateRequest())).thenThrow(new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Person non trovata"));
         mockMvc.perform(put("/api/person/1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                                "firstName" : "",
-                                "lastName" : "Rossi",
-                                "dateOfBirth" : "1990-05-15"
-                            }
-                         """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PERSON_DATA"))
-                .andExpect(jsonPath("$.message").value("Nome obbligatorio"));
-        verify(personService).update(1L, invalid);
+                        .content(UPDATE_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
+        verify(personService).update(1L, updateRequest());
     }
 
     @Test
@@ -198,9 +221,9 @@ public class PersonControllerTest {
 
     @Test
     void createRejectJsonMalformed() throws Exception {
-        mockMvc.perform(post("/api/person")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{"))
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         verifyNoInteractions(personService);
@@ -208,15 +231,15 @@ public class PersonControllerTest {
 
     @Test
     void createInvalidDateFormat() throws Exception {
-        mockMvc.perform(post("/api/person")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                            "firstName": "Mario",
-                            "lastName": "Rossi",
-                            "dateOfBirth": "non-una-data"
-                        }
-                        """))
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "firstName": "Mario",
+                                    "lastName": "Rossi",
+                                    "dateOfBirth": "non-una-data"
+                                }
+                                """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         verifyNoInteractions(personService);
@@ -224,7 +247,7 @@ public class PersonControllerTest {
 
     @Test
     void createMissingBody() throws Exception {
-        mockMvc.perform(post("/api/person")
+        mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -241,7 +264,7 @@ public class PersonControllerTest {
 
     @Test
     void unexpectedInternalError() throws Exception {
-        when(personService.findAll()).thenThrow(new RuntimeException("Errore interno"));
+        when(personService.findAll(any(Pageable.class))).thenThrow(new RuntimeException("Errore interno"));
         mockMvc.perform(get("/api/person"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))

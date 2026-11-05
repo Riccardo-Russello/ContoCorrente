@@ -1,17 +1,20 @@
 package it.russello.contocorrente.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.service.PersonService;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-
-import java.util.List;
 
 @Tag(name = "Persone", description = "Gestione delle persone")
 @RestController
@@ -20,18 +23,14 @@ import java.util.List;
 public class PersonController {
     private final PersonService personService;
 
-    @Operation(summary = "Crea una persona")
-    @PostMapping
-    public ResponseEntity<PersonResponse> create(@RequestBody PersonRequest request) {
-        PersonResponse response = personService.create(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-
-    @Operation(summary = "Elenca tutte le persone")
+    @Operation(summary = "Elenca le persone con paginazione")
     @GetMapping
-    public ResponseEntity<List<PersonResponse>> findAll() {
-        return ResponseEntity.status(HttpStatus.OK).body(personService.findAll());
+    public ResponseEntity<PageResponse<PersonResponse>> findAll(
+            @ParameterObject
+            @PageableDefault(page = 0, size = 10, sort = "id", direction = Sort.Direction.ASC)
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(PageResponse.from(personService.findAll(pageable)));
     }
 
     @Operation(summary = "Cerca una persona per ID")
@@ -40,10 +39,16 @@ public class PersonController {
         return ResponseEntity.status(HttpStatus.OK).body(personService.findById(id));
     }
 
+    @Operation(summary = "Restituisce il profilo dell'utente autenticato")
+    @GetMapping("/my_profile")
+    public ResponseEntity<PersonResponse> myProfile() {
+        return ResponseEntity.status(HttpStatus.OK).body(personService.myProfile());
+    }
+
     @Operation(summary = "Aggiorna una persona")
     @PutMapping("/{id}")
     public ResponseEntity<PersonResponse> update(@PathVariable("id") Long id,
-                                                 @RequestBody PersonRequest request) {
+                                                 @Validated(PersonRequest.Update.class) @RequestBody PersonRequest request) {
         return ResponseEntity.status(HttpStatus.OK).body(personService.update(id, request));
     }
 

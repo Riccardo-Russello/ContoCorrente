@@ -1,9 +1,10 @@
 package it.russello.contocorrente.repository;
 
 import it.russello.contocorrente.entity.Account;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<Account, Long> {
@@ -15,5 +16,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     boolean existsByPerson_Id(Long personId);
 
-    List<Account> findByPerson_Id(Long personId);
+    Page<Account> findByPerson_Id(Long personId, Pageable pageable);
+
+    boolean existsByIdAndPerson_Id(Long accountId, Long personId);
 }
